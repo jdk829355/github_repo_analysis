@@ -27,6 +27,10 @@ jest.mock('fs', () => ({
   writeFileSync: jest.fn(),
 }));
 
+jest.mock('os', () => ({
+  tmpdir: jest.fn(() => '/tmp'),
+}));
+
 jest.mock('../../lib/config', () => ({
   getAppUrl: jest.fn(() => 'http://localhost:3000'),
 }));
@@ -34,6 +38,7 @@ jest.mock('../../lib/config', () => ({
 describe('services/pdf-export', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.PDF_EXPORT_DIR;
   });
 
   describe('generateReportPdf', () => {
@@ -67,6 +72,12 @@ describe('services/pdf-export', () => {
         expect.stringContaining('저장소 설명'),
         { waitUntil: 'load' }
       );
+      const renderedHtml = mockSetContent.mock.calls[0][0];
+      expect(renderedHtml).toContain('<section class="section">');
+      expect(renderedHtml).toContain('<p class="summary-text">한글 요약</p>');
+      expect(renderedHtml).toContain('<ul class="repo-list">');
+      expect(renderedHtml).toContain('<strong>repo-a</strong>');
+      expect(renderedHtml).toContain('<ul class="definition-list">');
       expect(mockPdf).toHaveBeenCalledWith({
         path: expect.stringContaining('job-123.pdf'),
         format: 'A4',
@@ -83,7 +94,17 @@ describe('services/pdf-export', () => {
       const result = await generateReportPdf('job-456', report);
 
       expect(result).toMatch(/job-456\.pdf$/);
-      expect(result).toContain('/public/pdfs');
+      expect(result).toContain('/tmp/neutral-news/pdfs');
+    });
+
+    it('should allow overriding the PDF output directory', async () => {
+      process.env.PDF_EXPORT_DIR = '/custom/pdfs';
+      const { generateReportPdf } = await import('../../services/pdf-export');
+
+      const result = await generateReportPdf('job-env', report);
+
+      expect(result).toBe('/custom/pdfs/job-env.pdf');
+      delete process.env.PDF_EXPORT_DIR;
     });
 
     it('should handle browser launch errors', async () => {

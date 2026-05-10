@@ -26,6 +26,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PDF_EXPORT_DIR=/tmp/neutral-news/pdfs
 
 RUN apk add --no-cache \
     chromium \

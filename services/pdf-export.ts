@@ -1,8 +1,11 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 
-const PDF_DIR = join(process.cwd(), 'public', 'pdfs');
+function getPdfDir(): string {
+  return process.env.PDF_EXPORT_DIR || join(tmpdir(), 'neutral-news', 'pdfs');
+}
 
 export interface PdfRepository {
   name: string;
@@ -40,26 +43,45 @@ function renderList(items: string[]): string {
   return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
 }
 
-function renderPill(label: string, value: string): string {
-  return `<span class="pill"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</span>`;
+function renderDefinitionList(items: Array<{ label: string; value: string }>): string {
+  const visibleItems = items.filter((item) => item.value.trim().length > 0);
+
+  if (visibleItems.length === 0) {
+    return '<p class="muted">표시할 항목이 없습니다.</p>';
+  }
+
+  return `<ul class="definition-list">${visibleItems
+    .map(
+      (item) =>
+        `<li><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.value)}</span></li>`
+    )
+    .join('')}</ul>`;
 }
 
 function renderReportHtml(report: PdfReport): string {
   const repositories = report.repositories.length > 0
     ? report.repositories
         .map((repo) => `
-          <article class="repo-card">
-            <div class="repo-header">
-              <div>
-                <h3>${escapeHtml(repo.name)}</h3>
-                <p class="repo-meta">${escapeHtml(repo.language || '언어 정보 없음')}${repo.stars > 0 ? ` · ★ ${repo.stars}` : ''}</p>
-              </div>
-            </div>
-            <p class="repo-description">${escapeHtml(repo.description || '설명이 없습니다.')}</p>
-          </article>
+          <li>
+            <strong>${escapeHtml(repo.name)}</strong>
+            <span>${escapeHtml(repo.language || '언어 정보 없음')}${repo.stars > 0 ? ` · ★ ${repo.stars}` : ''}</span>
+            <p>${escapeHtml(repo.description || '설명이 없습니다.')}</p>
+          </li>
         `)
         .join('')
     : '<p class="muted">표시할 저장소가 없습니다.</p>';
+
+  const roleItems = [
+    { label: '주요 역할', value: report.roleEstimation.primary },
+    {
+      label: '보조 역할',
+      value: report.roleEstimation.secondary.join(', '),
+    },
+    {
+      label: '추천 역할',
+      value: report.roleEstimation.recommended.join(', '),
+    },
+  ];
 
   return `<!doctype html>
 <html lang="ko">
@@ -138,68 +160,50 @@ function renderReportHtml(report: PdfReport): string {
       }
 
       .section {
-        margin-bottom: 12pt;
-        padding: 14pt;
-        border: 1pt solid #e0e2eb;
-        border-radius: 8pt;
-        background: #f1f3fc;
-        break-inside: avoid;
-        page-break-inside: avoid;
+        margin-bottom: 18pt;
+        padding-top: 10pt;
+        border-top: 1pt solid #d7ddea;
       }
 
-      .repo-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10pt;
+      .section-title {
+        margin-bottom: 8pt;
+        break-after: avoid;
+        page-break-after: avoid;
       }
 
-      .repo-card {
-        padding: 11pt;
-        border: 1pt solid #e0e2eb;
-        border-radius: 7pt;
-        background: #ffffff;
-        break-inside: avoid;
-        page-break-inside: avoid;
+      .summary-text {
+        white-space: pre-wrap;
       }
 
-      .repo-card h3 {
+      .definition-list,
+      .repo-list {
+        margin: 0;
+        padding-left: 18pt;
+      }
+
+      .definition-list li,
+      .repo-list li {
+        break-inside: auto;
+        page-break-inside: auto;
+      }
+
+      .definition-list li strong,
+      .repo-list li strong {
+        display: inline-block;
+        margin-right: 6pt;
         color: #181c22;
       }
 
-      .repo-meta {
-        margin-top: 2pt;
+      .definition-list li span,
+      .repo-list li span {
         color: #717785;
-        font-size: 8pt;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+        font-size: 9pt;
       }
 
-      .repo-description {
-        margin-top: 8pt;
+      .repo-list li p {
+        margin-top: 4pt;
         color: #414753;
         font-size: 10pt;
-      }
-
-      .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6pt;
-      }
-
-      .pill {
-        display: inline-flex;
-        gap: 5pt;
-        padding: 6pt 9pt;
-        border-radius: 999pt;
-        background: #e0e2eb;
-        color: #414753;
-        font-size: 8pt;
-        font-weight: 700;
-      }
-
-      .pill strong {
-        color: #005ab4;
       }
 
       .muted {
@@ -215,31 +219,27 @@ function renderReportHtml(report: PdfReport): string {
     </header>
 
     <section class="section">
-      <h2>전체 요약</h2>
-      <p>${escapeHtml(report.overallSummary)}</p>
+      <h2 class="section-title">전체 요약</h2>
+      <p class="summary-text">${escapeHtml(report.overallSummary)}</p>
     </section>
 
     <section class="section">
-      <h2>Pin된 저장소</h2>
-      <div class="repo-grid">${repositories}</div>
+      <h2 class="section-title">Pin된 저장소</h2>
+      ${report.repositories.length > 0 ? `<ul class="repo-list">${repositories}</ul>` : repositories}
     </section>
 
     <section class="section">
-      <h2>예상 역할</h2>
-      <div class="pill-row">
-        ${renderPill('주요', report.roleEstimation.primary)}
-        ${report.roleEstimation.secondary.map((role) => renderPill('보조', role)).join('')}
-        ${report.roleEstimation.recommended.map((role) => renderPill('추천', role)).join('')}
-      </div>
+      <h2 class="section-title">예상 역할</h2>
+      ${renderDefinitionList(roleItems)}
     </section>
 
     <section class="section">
-      <h2>엔지니어링 강점</h2>
+      <h2 class="section-title">엔지니어링 강점</h2>
       ${renderList(report.engineeringStrengths)}
     </section>
 
     <section class="section">
-      <h2>협업 패턴</h2>
+      <h2 class="section-title">협업 패턴</h2>
       ${renderList(report.collaborationPatterns)}
     </section>
   </body>
@@ -247,7 +247,10 @@ function renderReportHtml(report: PdfReport): string {
 }
 
 export async function generateReportPdf(jobId: string, report: PdfReport): Promise<string> {
-  mkdirSync(PDF_DIR, { recursive: true });
+  const pdfDir = getPdfDir();
+  const pdfPath = join(pdfDir, `${jobId}.pdf`);
+
+  mkdirSync(pdfDir, { recursive: true });
 
   const browser = await chromium.launch({
     headless: true,
@@ -258,7 +261,6 @@ export async function generateReportPdf(jobId: string, report: PdfReport): Promi
     const page = await browser.newPage();
     await page.setContent(renderReportHtml(report), { waitUntil: 'load' });
 
-    const pdfPath = join(PDF_DIR, `${jobId}.pdf`);
     await page.pdf({
       path: pdfPath,
       format: 'A4',

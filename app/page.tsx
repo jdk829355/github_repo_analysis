@@ -36,7 +36,7 @@ export default function Home() {
       <div className="w-full max-w-4xl text-center">
         <div className="mb-8 space-y-4">
           <h1 className="text-[40px] leading-[48px] md:text-[48px] md:leading-[56px] font-extrabold tracking-tight text-[#181c22]">
-            GitHub 프로필 분석기
+            Pinned Signal
           </h1>
           <p className="mx-auto max-w-2xl text-base leading-6 text-[#414753]">
             GitHub 프로필을 분석하여 프로젝트, 역할, 엔지니어링 강점을 발견하세요

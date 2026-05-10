@@ -100,6 +100,35 @@ export async function getUserProfile(username: string): Promise<Record<string, u
   return data as Record<string, unknown>;
 }
 
+export async function hasUserStarredRepository(
+  username: string,
+  owner: string,
+  repo: string
+): Promise<boolean> {
+  const normalizedUsername = username.toLowerCase();
+  let page = 1;
+
+  while (true) {
+    const endpoint = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/stargazers?per_page=${MAX_PER_PAGE}&page=${page}`;
+    const data = await githubRequest(endpoint);
+    const stargazers = data as Array<{ login?: string }>;
+
+    if (!Array.isArray(stargazers) || stargazers.length === 0) {
+      return false;
+    }
+
+    if (stargazers.some((stargazer) => stargazer.login?.toLowerCase() === normalizedUsername)) {
+      return true;
+    }
+
+    if (stargazers.length < MAX_PER_PAGE) {
+      return false;
+    }
+
+    page++;
+  }
+}
+
 export interface Repository {
   id: number;
   name: string;

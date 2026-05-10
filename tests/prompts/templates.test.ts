@@ -222,6 +222,17 @@ describe('prompts/repository-analysis', () => {
     expect(rendered).toContain('Architecture Contributor');
   });
 
+  it('render instructs the model to summarize the user role from commit history', () => {
+    const input = {
+      repositoryName: 'test-repo',
+      commitLogs: [{ message: 'feat: implement auth API', date: '2024-01-01', author: 'dev' }],
+    };
+    const rendered = repositoryAnalysis.render(input);
+    expect(rendered).toContain('commit history');
+    expect(rendered).toContain("user's role");
+    expect(rendered).toContain('instead of the GitHub repository description');
+  });
+
   it('render includes output JSON format specification', () => {
     const input = { repositoryName: 'test' };
     const rendered = repositoryAnalysis.render(input);

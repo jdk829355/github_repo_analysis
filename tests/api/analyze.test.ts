@@ -3,6 +3,7 @@ const mockCheckJobDeduplication = jest.fn();
 const mockSetJobActive = jest.fn();
 const mockAnalysisQueueAdd = jest.fn();
 const mockGetUserProfile = jest.fn();
+const mockHasUserStarredRepository = jest.fn();
 
 jest.mock('../../lib/utils', () => ({
   normalizeGitHubUrl: mockNormalizeGitHubUrl,
@@ -10,6 +11,7 @@ jest.mock('../../lib/utils', () => ({
 
 jest.mock('../../services/github-client', () => ({
   getUserProfile: mockGetUserProfile,
+  hasUserStarredRepository: mockHasUserStarredRepository,
 }));
 
 jest.mock('../../services/cache', () => ({
@@ -40,6 +42,7 @@ import { POST } from '../../app/api/analyze/route';
 describe('POST /api/analyze', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHasUserStarredRepository.mockResolvedValue(true);
   });
 
   function createRequest(body: unknown): Request {
@@ -86,6 +89,21 @@ describe('POST /api/analyze', () => {
     const data = await response.json();
     expect(data).toEqual({ jobId: 'existing-job-123', status: 'PROCESSING' });
     expect(mockCheckJobDeduplication).toHaveBeenCalledWith(githubUrl);
+  });
+
+  it('returns 403 when verification repository is not starred', async () => {
+    const githubUrl = 'https://github.com/testuser';
+    mockNormalizeGitHubUrl.mockReturnValue(githubUrl);
+    mockGetUserProfile.mockResolvedValue({ login: 'testuser' });
+    mockHasUserStarredRepository.mockResolvedValue(false);
+
+    const request = createRequest({ url: 'testuser' });
+    const response = await POST(request as any);
+    expect(response.status).toBe(403);
+    const data = await response.json();
+    expect(data.error).toContain('star');
+    expect(mockCheckJobDeduplication).not.toHaveBeenCalled();
+    expect(mockAnalysisQueueAdd).not.toHaveBeenCalled();
   });
 
   it('creates new job and returns 202', async () => {

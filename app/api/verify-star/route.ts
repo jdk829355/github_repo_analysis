@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { normalizeGitHubUrl } from '../../../lib/utils';
-import { GitHubAPIError } from '../../../lib/errors';
 import {
   VERIFICATION_REPO_NAME,
   VERIFICATION_REPO_OWNER,
   VERIFICATION_REPO_URL,
 } from '../../../lib/constants';
+import { GitHubAPIError } from '../../../lib/errors';
+import { normalizeGitHubUrl } from '../../../lib/utils';
 import { getUserProfile, hasUserStarredRepository } from '../../../services/github-client';
-import { checkJobDeduplication, setJobActive } from '../../../services/cache';
-import { analysisQueue } from '../../../workers/analysis-worker';
-
-const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,8 +42,7 @@ export async function POST(request: NextRequest) {
     try {
       normalizedUrl = normalizeGitHubUrl(url);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Invalid URL';
+      const message = error instanceof Error ? error.message : 'Invalid URL';
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
@@ -65,11 +59,19 @@ export async function POST(request: NextRequest) {
       if (!hasStarred) {
         return NextResponse.json(
           {
-            error: `분석을 시작하려면 ${VERIFICATION_REPO_URL} 저장소에 star를 남긴 뒤 다시 검증해주세요.`,
+            verified: false,
+            error: `${VERIFICATION_REPO_URL} 저장소의 star 목록에서 ${username} 계정을 찾지 못했습니다.`,
+            repositoryUrl: VERIFICATION_REPO_URL,
           },
           { status: 403 }
         );
       }
+
+      return NextResponse.json({
+        verified: true,
+        username,
+        repositoryUrl: VERIFICATION_REPO_URL,
+      });
     } catch (error) {
       if (error instanceof GitHubAPIError) {
         if (error.statusCode === 404) {
@@ -87,43 +89,8 @@ export async function POST(request: NextRequest) {
       }
       throw error;
     }
-
-    const existingJobId = await checkJobDeduplication(normalizedUrl);
-    if (existingJobId) {
-      const job = await prisma.analysis_jobs.findUnique({
-        where: { id: existingJobId },
-      });
-
-      if (job) {
-        return NextResponse.json(
-          { jobId: job.id, status: job.status },
-          { status: 200 }
-        );
-      }
-    }
-
-    const job = await prisma.analysis_jobs.create({
-      data: {
-        github_profile: normalizedUrl,
-        status: 'PENDING',
-      },
-    });
-
-    await setJobActive(normalizedUrl, job.id);
-
-    await analysisQueue.add(
-      'analyze',
-      { username, githubUrl: normalizedUrl },
-      { jobId: job.id }
-    );
-
-    return NextResponse.json(
-      { jobId: job.id, status: job.status },
-      { status: 202 }
-    );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Internal server error';
+    const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

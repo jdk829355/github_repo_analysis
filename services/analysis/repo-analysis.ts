@@ -222,7 +222,7 @@ export async function analyzeRepositoryPipeline(
         analysis_job_id: analysisJobId,
         name: repository.name,
         full_name: repository.full_name,
-        description: repository.description,
+        description: validated.summary,
         primary_language: repository.language,
         stars: repository.stargazers_count,
         forks: repository.forks_count,

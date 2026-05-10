@@ -131,6 +131,7 @@ describe('services/analysis/repo-analysis', () => {
           analysis_job_id: 'analysis-1',
           name: 'sample-repo',
           full_name: 'testuser/sample-repo',
+          description: 'Sample summary',
         }),
       })
     );

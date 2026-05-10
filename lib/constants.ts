@@ -4,3 +4,6 @@ export const MAX_CONCURRENT_ANALYSIS = 3;
 export const ANALYSIS_TIMEOUT_MS = 600000;
 export const README_MAX_SIZE_BYTES = 10240;
 export const GITHUB_API_VERSION = '2022-11-28';
+export const VERIFICATION_REPO_OWNER = 'jdk829355';
+export const VERIFICATION_REPO_NAME = 'github_repo_analysis';
+export const VERIFICATION_REPO_URL = `https://github.com/${VERIFICATION_REPO_OWNER}/${VERIFICATION_REPO_NAME}`;

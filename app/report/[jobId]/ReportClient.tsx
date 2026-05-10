@@ -122,6 +122,12 @@ function RoleSection({ roleEstimation }: { roleEstimation: RoleEstimation }) {
 
 function ReportContent({ report }: { report: ProfileReport }) {
   const repos = report.repositories || [];
+  const [showAllStrengths, setShowAllStrengths] = useState(false);
+  const engineeringStrengths = report.engineeringStrengths || [];
+  const visibleEngineeringStrengths = showAllStrengths
+    ? engineeringStrengths
+    : engineeringStrengths.slice(0, 3);
+  const hiddenEngineeringStrengthCount = engineeringStrengths.length - visibleEngineeringStrengths.length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -168,13 +174,32 @@ function ReportContent({ report }: { report: ProfileReport }) {
         <RoleSection roleEstimation={report.roleEstimation} />
       </SectionCard>
 
-      {report.engineeringStrengths && report.engineeringStrengths.length > 0 && (
+      {engineeringStrengths.length > 0 && (
         <SectionCard title="엔지니어링 강점">
           <ul className="space-y-2">
-            {report.engineeringStrengths.map((strength, index) => (
+            {visibleEngineeringStrengths.map((strength, index) => (
               <ListItem key={index} item={strength} />
             ))}
           </ul>
+          {engineeringStrengths.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setShowAllStrengths((current) => !current)}
+              className="inline-flex w-fit items-center gap-2 rounded-lg border border-[#c1c6d5] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22] focus:outline-none focus:ring-2 focus:ring-[#005ab4] focus:ring-offset-2 focus:ring-offset-[#f1f3fc]"
+              aria-expanded={showAllStrengths}
+            >
+              <span>{showAllStrengths ? '접기' : `${hiddenEngineeringStrengthCount}개 더 보기`}</span>
+              <svg
+                className={`h-[18px] w-[18px] transition-transform ${showAllStrengths ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
         </SectionCard>
       )}
 

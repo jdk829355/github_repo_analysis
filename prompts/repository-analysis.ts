@@ -4,7 +4,7 @@ import type { z } from 'zod';
 type RepositoryAnalysisInput = z.infer<typeof RepositoryAnalysisInputSchema>;
 
 const SYSTEM_PROMPT = `You are an expert software engineer analyzing a GitHub repository.
-Your task is to analyze the repository and provide structured insights about the developer's work.
+Your task is to analyze the user's role in this repository based primarily on their commit history, then provide structured insights about the developer's work.
 
 ## ROLE SIGNALS TO LOOK FOR
 When analyzing, identify these specific roles based on evidence:
@@ -27,7 +27,7 @@ CRITICAL: You must ONLY report what can be verified from the provided evidence.
 const OUTPUT_FORMAT = `## OUTPUT FORMAT
 Respond ONLY with valid JSON matching this exact schema.
 IMPORTANT: All text values must be written in Korean (한글).
-- summary: brief description of what this project does in Korean
+- summary: concise role analysis for this user in this repository in Korean. This will be shown in the report under the pinned repository instead of the GitHub repository description.
 - mainContributions: specific features or work items identified in Korean
 - techStack: technologies explicitly mentioned in evidence (can be in English if they are proper nouns)
 - leadershipSignals: evidence of technical leadership or mentorship in Korean
@@ -35,7 +35,7 @@ IMPORTANT: All text values must be written in Korean (한글).
 Schema:
 {
   "repositoryName": "string - exact name from input",
-  "summary": "string - brief description of what this project does in Korean",
+  "summary": "string - concise analysis of the user's role in this repository based on commit logs, written in Korean",
   "projectType": "string - e.g., web-app, library, CLI tool, mobile-app, API",
   "estimatedRoles": ["Backend", "Frontend", etc. - from role signals above],
   "mainContributions": ["string - specific features or work items identified in Korean"],
@@ -76,7 +76,7 @@ function buildUserPrompt(input: RepositoryAnalysisInput): string {
     prompt += `\n`;
   }
 
-  prompt += `Based on the evidence above, identify the project type, roles, contributions, tech stack, and any leadership signals.\n`;
+  prompt += `Based on the evidence above, especially the commit history authored by this user, identify the user's role in this repository, their concrete contributions, the project type, tech stack, and any leadership signals.\n`;
 
   return prompt;
 }
@@ -94,6 +94,6 @@ ${OUTPUT_FORMAT}
 
 ${userPrompt}
 
-Analyze the repository and respond with JSON only.`;
+Analyze the user's role in this repository and respond with JSON only.`;
   },
 };

@@ -14,7 +14,7 @@ export type Role = string;
  */
 export const RepositoryAnalysisSchema = z.object({
   repositoryName: z.string().describe('Name of the repository'),
-  summary: z.string().describe('Brief summary of the repository purpose and functionality'),
+  summary: z.string().describe('Concise role analysis for the user in this repository'),
   projectType: z.string().describe('Type of project (e.g., web-app, library, CLI tool, mobile-app)'),
   estimatedRoles: z.array(RoleSchema).describe('Roles inferred from commit patterns and README'),
   mainContributions: z.array(z.string()).describe('Key contributions or features implemented'),

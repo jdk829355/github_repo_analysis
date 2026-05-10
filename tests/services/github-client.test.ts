@@ -3,6 +3,7 @@ import {
   getUserRepositories,
   getRepositoryReadme,
   getRepositoryCommits,
+  hasUserStarredRepository,
 } from '../../services/github-client';
 import { GitHubAPIError } from '../../lib/errors';
 import { MAX_REPOS, MAX_COMMITS_PER_REPO, GITHUB_API_VERSION } from '../../lib/constants';
@@ -192,6 +193,64 @@ describe('services/github-client', () => {
       expect(result).toEqual(mockData);
       // Exponential backoff: 1st retry ~100ms, 2nd retry ~200ms
       expect(elapsed).toBeGreaterThanOrEqual(250);
+    });
+  });
+
+  describe('hasUserStarredRepository', () => {
+    it('should return true when the user is in the stargazer list', async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(200, [
+          { login: 'other-user' },
+          { login: 'TestUser' },
+        ], {
+          'x-ratelimit-remaining': '4999',
+        })
+      );
+
+      const result = await hasUserStarredRepository('testuser', 'owner', 'repo');
+
+      expect(result).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/stargazers?per_page=100&page=1',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token',
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': GITHUB_API_VERSION,
+          }),
+        })
+      );
+    });
+
+    it('should return false when the user is not in the stargazer list', async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(200, [{ login: 'other-user' }], {
+          'x-ratelimit-remaining': '4999',
+        })
+      );
+
+      await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(false);
+    });
+
+    it('should continue to the next stargazer page when needed', async () => {
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse(200, Array.from({ length: 100 }, (_, index) => ({ login: `user-${index}` })), {
+            'x-ratelimit-remaining': '4999',
+          })
+        )
+        .mockResolvedValueOnce(
+          createMockResponse(200, [{ login: 'testuser' }], {
+            'x-ratelimit-remaining': '4999',
+          })
+        );
+
+      await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        'https://api.github.com/repos/owner/repo/stargazers?per_page=100&page=2',
+        expect.any(Object)
+      );
     });
   });
 

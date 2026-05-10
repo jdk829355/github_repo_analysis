@@ -119,7 +119,7 @@ export async function runAnalysisPipeline(
             analysis_job_id: jobId,
             name: previous.repository.name,
             full_name: previous.repository.full_name,
-            description: previous.repository.description,
+            description: previous.analysis.summary,
             primary_language: previous.repository.primary_language,
             stars: previous.repository.stars,
             forks: previous.repository.forks,

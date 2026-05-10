@@ -1,0 +1,252 @@
+import { PrismaClient } from '@prisma/client';
+import { ANALYSIS_TIMEOUT_MS } from '../../lib/constants';
+import { AnalysisError } from '../../lib/errors';
+import { truncateToMaxSize } from '../../lib/utils';
+import { filterCommits } from '../../lib/commit-filter';
+import * as cache from '../cache';
+import { setJobRepoList } from '../cache';
+import * as githubClient from '../github-client';
+import type { Repository } from '../github-client';
+import * as llmClient from '../llm-client';
+import { analyzeRepositoryPipeline, type RepoAnalysisDeps } from './repo-analysis';
+import { aggregateProfile } from './profile-aggregation';
+import { publishEvent } from '../../workers/analysis-worker';
+
+const prisma = new PrismaClient();
+
+const githubClientWithGetRepository = {
+  ...githubClient,
+  getRepository: githubClient.getRepository,
+};
+
+function createRepoAnalysisDeps(): RepoAnalysisDeps {
+  return {
+    githubClient: githubClientWithGetRepository,
+    llmClient,
+    cache,
+    publishEvent: async (jobId: string, event: Record<string, unknown>) => {
+      await publishEvent(jobId, event);
+    },
+    prisma,
+    filterCommits,
+    truncateToMaxSize,
+  };
+}
+
+export async function runAnalysisPipeline(
+  username: string,
+  githubUrl: string,
+  jobId: string
+): Promise<void> {
+  try {
+    await prisma.analysis_jobs.update({
+      where: { id: jobId },
+      data: { status: 'PROCESSING' },
+    });
+    await publishEvent(jobId, {
+      type: 'stateChange',
+      state: 'PROCESSING',
+      jobId,
+    });
+
+    const { repositories } = await githubClient.getUserPinnedRepositories(username);
+
+    if (repositories.length === 0) {
+      await prisma.analysis_jobs.update({
+        where: { id: jobId },
+        data: {
+          status: 'FAILED',
+          error_message: 'No pinned repositories found',
+        },
+      });
+      await cache.clearJobActive(githubUrl);
+      await publishEvent(jobId, {
+        type: 'stateChange',
+        state: 'FAILED',
+        jobId,
+        error: 'No pinned repositories found',
+      });
+      throw new AnalysisError('No pinned repositories found', 'fetch');
+    }
+
+    await setJobRepoList(jobId, repositories.map((r) => r.name));
+    await publishEvent(jobId, {
+      type: 'repo_list',
+      totalRepos: repositories.length,
+      repos: repositories.map((r) => r.name),
+      jobId,
+    });
+
+    const previousJob = await prisma.analysis_jobs.findFirst({
+      where: {
+        github_profile: githubUrl,
+        status: 'COMPLETED',
+        id: { not: jobId },
+      },
+      orderBy: { created_at: 'desc' },
+      include: {
+        repositories: {
+          include: {
+            repository_analyses: true,
+          },
+        },
+      },
+    });
+
+    const previousAnalyses = new Map<string, {
+      repository: { name: string; full_name: string; description: string | null; primary_language: string | null; stars: number; forks: number; is_fork: boolean; is_archived: boolean; updated_at: Date };
+      analysis: { repository_name: string; summary: string; project_type: string; estimated_roles: string[]; main_contributions: string[]; tech_stack: string[]; leadership_signals: string[]; confidence: number };
+    }>();
+
+    if (previousJob) {
+      for (const repo of previousJob.repositories) {
+        const analysis = repo.repository_analyses[0];
+        if (analysis) {
+          previousAnalyses.set(repo.name, {
+            repository: repo,
+            analysis: analysis,
+          });
+        }
+      }
+    }
+
+    const reposToAnalyze: Repository[] = [];
+    for (const repo of repositories) {
+      const previous = previousAnalyses.get(repo.name);
+      if (previous) {
+        const createdRepo = await prisma.repositories.create({
+          data: {
+            analysis_job_id: jobId,
+            name: previous.repository.name,
+            full_name: previous.repository.full_name,
+            description: previous.repository.description,
+            primary_language: previous.repository.primary_language,
+            stars: previous.repository.stars,
+            forks: previous.repository.forks,
+            is_fork: previous.repository.is_fork,
+            is_archived: previous.repository.is_archived,
+            updated_at: previous.repository.updated_at,
+          },
+        });
+
+        await prisma.repository_analyses.create({
+          data: {
+            repository_id: createdRepo.id,
+            repository_name: previous.analysis.repository_name,
+            summary: previous.analysis.summary,
+            project_type: previous.analysis.project_type,
+            estimated_roles: previous.analysis.estimated_roles,
+            main_contributions: previous.analysis.main_contributions,
+            tech_stack: previous.analysis.tech_stack,
+            leadership_signals: previous.analysis.leadership_signals,
+            confidence: previous.analysis.confidence,
+          },
+        });
+
+        await publishEvent(jobId, {
+          type: 'repo_analysis_completed',
+          repo: repo.name,
+          summary: previous.analysis.summary,
+        });
+      } else {
+        reposToAnalyze.push(repo);
+      }
+    }
+
+    const deps = createRepoAnalysisDeps();
+
+    const analysisWork = async () => {
+      for (const repo of reposToAnalyze) {
+        await analyzeRepositoryPipeline(
+          {
+            jobId,
+            analysisJobId: jobId,
+            username,
+            repoName: repo.name,
+            owner: repo.owner || username,
+          },
+          deps
+        );
+      }
+
+      await aggregateProfile(
+        { username, jobId },
+        {
+          prisma,
+          llmClient: { aggregateProfile: llmClient.aggregateProfile },
+          cache: { setCachedLLMOutput: cache.setCachedLLMOutput },
+          publishEvent: async (eventJobId, event) => {
+            await publishEvent(eventJobId, event);
+          },
+        }
+      );
+    };
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new AnalysisError(
+            `Analysis timed out after ${ANALYSIS_TIMEOUT_MS}ms`,
+            'aggregate'
+          )
+        );
+      }, ANALYSIS_TIMEOUT_MS);
+    });
+
+    await Promise.race([analysisWork(), timeoutPromise]);
+
+    await prisma.analysis_jobs.update({
+      where: { id: jobId },
+      data: { status: 'COMPLETED', completed_at: new Date() },
+    });
+    await publishEvent(jobId, {
+      type: 'stateChange',
+      state: 'COMPLETED',
+      jobId,
+    });
+    await publishEvent(jobId, {
+      type: 'job_complete',
+      state: 'COMPLETED',
+      jobId,
+    });
+  } catch (error) {
+    await prisma.analysis_jobs.update({
+      where: { id: jobId },
+      data: {
+        status: 'FAILED',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+    await cache.clearJobActive(githubUrl);
+    await publishEvent(jobId, {
+      type: 'stateChange',
+      state: 'FAILED',
+      jobId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
+  }
+}
+
+export async function startAnalysis(
+  username: string,
+  githubUrl: string
+): Promise<string> {
+  const existingJobId = await cache.checkJobDeduplication(githubUrl);
+  if (existingJobId) {
+    return existingJobId;
+  }
+
+  const job = await prisma.analysis_jobs.create({
+    data: {
+      github_profile: githubUrl,
+      status: 'PENDING',
+    },
+  });
+
+  await cache.setJobActive(githubUrl, job.id);
+
+  await runAnalysisPipeline(username, githubUrl, job.id);
+
+  return job.id;
+}

@@ -1,0 +1,9 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "GitHub 프로필 분석기" [level=1] [ref=e5]
+      - paragraph [ref=e6]: GitHub 프로필을 분석하여 프로젝트, 역할, 엔지니어링 강점을 발견하세요
+    - generic [ref=e9]:
+      - textbox "https://github.com/username" [ref=e10]
+      - button "분석하기" [ref=e11]
+  - alert [ref=e12]

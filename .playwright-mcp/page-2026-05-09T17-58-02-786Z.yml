@@ -1,0 +1,9 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "GitHub Profile Analyzer" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Analyze any GitHub profile to discover projects, roles, and engineering strengths
+    - generic [ref=e9]:
+      - textbox "https://github.com/username" [ref=e10]
+      - button "Analyze" [ref=e11]
+  - alert [ref=e12]

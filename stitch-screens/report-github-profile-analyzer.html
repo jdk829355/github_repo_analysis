@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GitHub Profile Analysis Report</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#321200",
+                        "tertiary-fixed": "#ffdbc9",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f1f3fc",
+                        "secondary-container": "#b6d0ff",
+                        "background": "#f9f9ff",
+                        "tertiary-fixed-dim": "#ffb68c",
+                        "surface-bright": "#f9f9ff",
+                        "on-secondary-container": "#3f5881",
+                        "surface-container-highest": "#e0e2eb",
+                        "on-tertiary-container": "#fffbff",
+                        "on-surface": "#181c22",
+                        "tertiary-container": "#bd5700",
+                        "on-surface-variant": "#414753",
+                        "outline-variant": "#c1c6d5",
+                        "surface-variant": "#e0e2eb",
+                        "tertiary": "#964400",
+                        "outline": "#717785",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e6e8f1",
+                        "secondary-fixed": "#d6e3ff",
+                        "primary-fixed": "#d6e3ff",
+                        "on-tertiary-fixed-variant": "#763400",
+                        "surface-container": "#ebedf7",
+                        "on-primary-fixed-variant": "#00458d",
+                        "primary": "#005ab4",
+                        "on-primary-container": "#fefcff",
+                        "on-background": "#181c22",
+                        "inverse-primary": "#aac7ff",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2d3037",
+                        "surface": "#f9f9ff",
+                        "primary-container": "#0a73e0",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#aac7ff",
+                        "secondary": "#465f88",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#001b3e",
+                        "secondary-fixed-dim": "#aec7f7",
+                        "inverse-on-surface": "#eef0fa",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#d7dae3",
+                        "surface-tint": "#005db8",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#001b3d",
+                        "on-secondary-fixed-variant": "#2d476f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "xs": "4px",
+                        "gutter": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "margin": "24px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col antialiased">
+<!-- Top Action Bar (Contextual departure from main nav) -->
+<header class="w-full px-xl py-md max-w-[1152px] mx-auto flex justify-between items-center bg-transparent">
+<button class="flex items-center gap-sm text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md px-md py-sm rounded-lg border border-outline-variant hover:border-outline">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Main Screen
+        </button>
+<button class="flex items-center gap-sm text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md px-md py-sm rounded-lg border border-outline-variant hover:border-outline">
+<span class="material-symbols-outlined text-[18px]">download</span>
+            Download PDF
+        </button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow w-full max-w-[800px] mx-auto px-margin py-xl flex flex-col gap-xl">
+<!-- Header -->
+<div class="text-center mb-md">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">GitHub Profile Analysis Report</h1>
+</div>
+<!-- Section: Overall Summary -->
+<section class="bg-surface-container-low rounded-xl p-lg flex flex-col gap-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface">Overall Summary</h2>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                This developer demonstrates strong capabilities in backend and frontend development, leveraging languages like Python, TypeScript, and Go across various projects. They have experience with AI/ML integration, data pipelines, and cloud infrastructure (AWS), along with a solid understanding of DevOps practices and collaborative workflows.
+            </p>
+</section>
+<!-- Section: Repository Details -->
+<section class="bg-surface-container-low rounded-xl p-lg flex flex-col gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Repository Details</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Repo Card 1 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-lg p-md flex justify-between items-center hover:border-primary transition-colors cursor-pointer group">
+<div class="flex flex-col gap-xs">
+<span class="font-body-lg text-body-lg font-semibold text-on-surface">jandi-be</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Python</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<!-- Repo Card 2 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-lg p-md flex justify-between items-center hover:border-primary transition-colors cursor-pointer group">
+<div class="flex flex-col gap-xs">
+<span class="font-body-lg text-body-lg font-semibold text-on-surface">todowith</span>
+<span class="font-label-md text-label-md text-on-surface-variant">TypeScript</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<!-- Repo Card 3 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-lg p-md flex justify-between items-center hover:border-primary transition-colors cursor-pointer group">
+<div class="flex flex-col gap-xs">
+<span class="font-body-lg text-body-lg font-semibold text-on-surface">trend_analysis</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Dart</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- Section: Expected Roles -->
+<section class="bg-surface-container-low rounded-xl p-lg flex flex-col gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Expected Roles</h2>
+<div class="flex flex-col gap-sm">
+<div class="flex flex-wrap gap-sm">
+<div class="bg-surface-variant text-on-surface-variant px-md py-sm rounded-full font-label-md text-label-md">
+                        Primary: Backend
+                    </div>
+<div class="bg-surface-variant text-on-surface-variant px-md py-sm rounded-full font-label-md text-label-md">
+                        Secondary: Frontend, DevOps, ML
+                    </div>
+</div>
+<div class="flex">
+<div class="bg-surface-variant text-on-surface-variant px-md py-sm rounded-full font-label-md text-label-md">
+                        Recommended: Full Stack Developer, Backend Engineer
+                    </div>
+</div>
+</div>
+</section>
+<!-- Section: Engineering Strengths -->
+<section class="bg-surface-container-low rounded-xl p-lg flex flex-col gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Engineering Strengths</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md font-body-md text-body-md text-on-surface-variant">
+<ul class="list-disc list-inside space-y-sm">
+<li>Python, TypeScript, Go</li>
+<li>FastAPI, React, Next.js</li>
+<li>Docker, Kubernetes</li>
+<li>PostgreSQL, Redis</li>
+<li>AI/ML Integration</li>
+</ul>
+<ul class="list-disc list-inside space-y-sm">
+<li>Data Pipelines, Real-time Systems</li>
+<li>Cloud Infrastructure (AWS)</li>
+<li>CI/CD, GitHub Actions</li>
+<li>gRPC, GraphQL</li>
+<li>Problem Solving, Collaboration</li>
+</ul>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="max-w-[1152px] mx-auto px-xl pt-section flex flex-col md:flex-row justify-between items-center gap-lg full-width pb-xl bg-surface-canvas-light dark:bg-surface-canvas-dark border-t-4 border-secondary dark:border-secondary-container">
+<div class="font-heading-md text-heading-md text-ink-deep dark:text-on-surface opacity-80 hover:opacity-100 transition-opacity">
+            GitSentri
+        </div>
+<div class="font-body-md text-body-md text-outline dark:text-on-surface-variant">
+            © 2024 GitSentri. Technical Subversion for Modern Devs.
+        </div>
+<nav class="flex gap-md font-button-cap text-button-cap">
+<a class="text-outline dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors" href="#">Documentation</a>
+<a class="text-outline dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors" href="#">Privacy Policy</a>
+<a class="text-outline dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors" href="#">Security</a>
+<a class="text-outline dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors" href="#">GitHub API</a>
+</nav>
+</footer>
+</body></html>

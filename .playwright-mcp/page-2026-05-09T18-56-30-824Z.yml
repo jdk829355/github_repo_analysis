@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "저장소 분석 중" [level=1] [ref=e5]
+      - paragraph
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: 진행 상황
+        - generic [ref=e10]: 0 / ?
+      - generic [ref=e14]: 시작 대기 중...
+  - alert [ref=e15]

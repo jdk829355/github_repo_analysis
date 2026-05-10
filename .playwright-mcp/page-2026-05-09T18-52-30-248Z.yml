@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "저장소 분석 중" [level=1] [ref=e5]
+      - paragraph
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: 진행 상황
+        - generic [ref=e9]: 2 / ?
+      - generic [ref=e13]: 시작 대기 중...
+    - generic [ref=e15]:
+      - heading "분석 완료된 저장소" [level=2] [ref=e16]
+      - generic [ref=e17]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - img [ref=e22]
+            - generic [ref=e24]:
+              - heading "linux" [level=3] [ref=e25]
+              - paragraph [ref=e26]: "실패: Schema validation failed"
+          - generic [ref=e27]: 완료
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - img [ref=e32]
+            - generic [ref=e34]:
+              - heading "AudioNoise" [level=3] [ref=e35]
+              - paragraph [ref=e36]: "실패: Schema validation failed"
+          - generic [ref=e37]: 완료
+  - alert [ref=e14]

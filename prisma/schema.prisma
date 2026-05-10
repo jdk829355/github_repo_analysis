@@ -1,0 +1,91 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AnalysisJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model analysis_jobs {
+  id              String           @id @default(cuid())
+  github_profile  String
+  status          AnalysisJobStatus @default(PENDING)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  completed_at    DateTime?
+  error_message   String?
+
+  repositories        repositories[]
+  profile_report      profile_reports?
+  pdf_exports         pdf_exports[]
+}
+
+model repositories {
+  id                  String   @id @default(cuid())
+  analysis_job_id     String
+  name                String
+  full_name           String
+  description         String?
+  primary_language    String?
+  stars               Int      @default(0)
+  forks               Int      @default(0)
+  is_fork             Boolean @default(false)
+  is_archived         Boolean @default(false)
+  updated_at          DateTime
+  fetched_at          DateTime @default(now())
+
+  analysis_job        analysis_jobs         @relation(fields: [analysis_job_id], references: [id])
+  repository_analyses repository_analyses[]
+
+  @@index([analysis_job_id])
+}
+
+model repository_analyses {
+  id                    String   @id @default(cuid())
+  repository_id         String
+  repository_name       String
+  summary               String
+  project_type          String
+  estimated_roles       String[]
+  main_contributions    String[]
+  tech_stack            String[]
+  leadership_signals     String[]
+  confidence            Float
+  created_at            DateTime @default(now())
+
+  repository           repositories @relation(fields: [repository_id], references: [id])
+
+  @@index([repository_id])
+}
+
+model profile_reports {
+  id                    String   @id @default(cuid())
+  analysis_job_id       String   @unique
+  overall_summary       String
+  role_estimation       Json
+  engineering_strengths String[]
+  collaboration_patterns String[]
+  created_at            DateTime @default(now())
+
+  analysis_job          analysis_jobs @relation(fields: [analysis_job_id], references: [id])
+}
+
+model pdf_exports {
+  id              String   @id @default(cuid())
+  analysis_job_id String
+  file_path       String
+  created_at      DateTime @default(now())
+
+  analysis_job    analysis_jobs @relation(fields: [analysis_job_id], references: [id])
+
+  @@index([analysis_job_id])
+}

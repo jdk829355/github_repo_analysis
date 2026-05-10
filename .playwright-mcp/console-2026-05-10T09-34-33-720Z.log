@@ -1,0 +1,15 @@
+[      99ms] [WARNING]   WARN  [Statsig] The user does not have the required id_type "userID" for Dynamic config "login_web_existing_user_login_option_google" @ https://auth-cdn.oaistatic.com/assets/statsig-CgmjJPd2.js:8
+[     100ms] [WARNING]   WARN  [Statsig] The user does not have the required id_type "userID" for Dynamic config "login_web_existing_user_login_option_microsoft" @ https://auth-cdn.oaistatic.com/assets/statsig-CgmjJPd2.js:8
+[     100ms] [WARNING]   WARN  [Statsig] The user does not have the required id_type "userID" for Dynamic config "login_web_existing_user_login_option_apple" @ https://auth-cdn.oaistatic.com/assets/statsig-CgmjJPd2.js:8
+[     100ms] [WARNING]   WARN  [Statsig] The user does not have the required id_type "userID" for Dynamic config "login_web_existing_user_login_option_email" @ https://auth-cdn.oaistatic.com/assets/statsig-CgmjJPd2.js:8
+[     100ms] [WARNING]   WARN  [Statsig] The user does not have the required id_type "userID" for Dynamic config "login_web_existing_user_login_option_phone_number" @ https://auth-cdn.oaistatic.com/assets/statsig-CgmjJPd2.js:8
+[     359ms] [WARNING] Datadog Browser SDK: Customer data exceeds the recommended 3KiB threshold. More details: https://docs.datadoghq.com/real_user_monitoring/browser/troubleshooting/#customer-data-exceeds-the-recommended-threshold-warning @ https://auth-cdn.oaistatic.com/assets/datadog-BTgRrIvw.js:6
+[    4582ms] [ERROR] TypeError: Failed to fetch
+    at o (https://auth-cdn.oaistatic.com/assets/datadog-BTgRrIvw.js:3:449)
+    at Be (https://auth-cdn.oaistatic.com/assets/segment-D7uOZEfY.js:2:21359)
+    at c (https://auth-cdn.oaistatic.com/assets/segment-D7uOZEfY.js:2:60901)
+    at Array.map (<anonymous>)
+    at https://auth-cdn.oaistatic.com/assets/segment-D7uOZEfY.js:2:62127
+    at https://auth-cdn.oaistatic.com/assets/segment-D7uOZEfY.js:2:59949 @ https://auth-cdn.oaistatic.com/assets/datadog-BTgRrIvw.js:6
+[    4613ms] [WARNING]   WARN  [Statsig] The user does not have the required id_type "userID" for Gate "codex_swic_new_workspace_picker" @ https://auth-cdn.oaistatic.com/assets/statsig-CgmjJPd2.js:8
+[    4819ms] [WARNING] Datadog Browser SDK: Customer data exceeds the recommended 3KiB threshold. More details: https://docs.datadoghq.com/real_user_monitoring/browser/troubleshooting/#customer-data-exceeds-the-recommended-threshold-warning @ https://auth-cdn.oaistatic.com/assets/datadog-BTgRrIvw.js:6

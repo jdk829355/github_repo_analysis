@@ -125,6 +125,10 @@ describe('services/analysis/repo-analysis', () => {
     }
     expect(RepositoryAnalysisSchema.parse(result.analysis)).toEqual(baseAnalysis);
     expect(mockSetCachedLLMOutput).toHaveBeenCalledWith('testuser', 'sample-repo', baseAnalysis);
+    expect(mockPublishEvent).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ type: 'repo_analysis_started', repo: 'sample-repo' })
+    );
     expect(mockRepositoriesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

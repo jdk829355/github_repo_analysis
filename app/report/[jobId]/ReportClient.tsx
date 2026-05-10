@@ -292,7 +292,7 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
         </a>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[800px] flex-col gap-8 px-6 py-8">
+      <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-6 py-8">
         <div className="mb-2 text-center">
           <h1 className="text-[32px] font-bold leading-10 text-[#181c22]">
             GitHub Profile Analysis Report

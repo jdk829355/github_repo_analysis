@@ -1,6 +1,7 @@
 const mockNormalizeGitHubUrl = jest.fn();
 const mockCheckJobDeduplication = jest.fn();
 const mockSetJobActive = jest.fn();
+const mockClearJobActive = jest.fn();
 const mockAnalysisQueueAdd = jest.fn();
 const mockGetUserProfile = jest.fn();
 const mockHasUserStarredRepository = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('../../services/github-client', () => ({
 
 jest.mock('../../services/cache', () => ({
   checkJobDeduplication: mockCheckJobDeduplication,
+  clearJobActive: mockClearJobActive,
   setJobActive: mockSetJobActive,
 }));
 
@@ -89,6 +91,34 @@ describe('POST /api/analyze', () => {
     const data = await response.json();
     expect(data).toEqual({ jobId: 'existing-job-123', status: 'PROCESSING' });
     expect(mockCheckJobDeduplication).toHaveBeenCalledWith(githubUrl);
+  });
+
+  it('ignores stale completed dedupe job and creates a new job', async () => {
+    const githubUrl = 'https://github.com/testuser';
+    mockNormalizeGitHubUrl.mockReturnValue(githubUrl);
+    mockGetUserProfile.mockResolvedValue({ login: 'testuser' });
+    mockCheckJobDeduplication.mockResolvedValue('completed-job-123');
+    mockAnalysisJobsFindUnique.mockResolvedValue({
+      id: 'completed-job-123',
+      status: 'COMPLETED',
+    });
+    mockAnalysisJobsCreate.mockResolvedValue({
+      id: 'new-job-456',
+      status: 'PENDING',
+    });
+
+    const request = createRequest({ url: 'testuser' });
+    const response = await POST(request as any);
+    expect(response.status).toBe(202);
+    const data = await response.json();
+    expect(data).toEqual({ jobId: 'new-job-456', status: 'PENDING' });
+    expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+    expect(mockSetJobActive).toHaveBeenCalledWith(githubUrl, 'new-job-456');
+    expect(mockAnalysisQueueAdd).toHaveBeenCalledWith(
+      'analyze',
+      { username: 'testuser', githubUrl },
+      { jobId: 'new-job-456' }
+    );
   });
 
   it('returns 403 when verification repository is not starred', async () => {

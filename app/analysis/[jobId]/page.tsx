@@ -90,9 +90,15 @@ function AnalysisProgressClient({
               }
               break;
 
-            case "repo_analysis_completed":
+            case "repo_analysis_started":
               if (data.repo) {
                 setCurrentRepo(data.repo);
+              }
+              break;
+
+            case "repo_analysis_completed":
+              if (data.repo) {
+                setCurrentRepo(null);
                 setCompletedRepos((prev) => [
                   ...prev,
                   { repo: data.repo!, summary: data.summary || "" },

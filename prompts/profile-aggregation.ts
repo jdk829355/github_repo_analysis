@@ -20,7 +20,18 @@ const SYNTHESIS_INSTRUCTIONS = `## SYNTHESIS INSTRUCTIONS
 2. Identify EXPERTISE areas: which technologies appear most frequently
 3. Determine LEADERSHIP: who shows architecture decisions, mentoring, or maintainer activity
 4. Assess VERSATILITY: breadth vs depth of experience
-5. Note COLLABORATION patterns: how developer collaborates with others`;
+5. Note COLLABORATION patterns: how developer collaborates with others
+6. Identify GAPS and WEAKNESSES: missing test coverage, lack of documentation, narrow tech stack, absence of observability/monitoring, missing CI/CD practices, or any areas where the developer could improve`;
+
+const BALANCED_PERSPECTIVE = `## BALANCED PERSPECTIVE INSTRUCTIONS
+The overallSummary must provide a HONEST and BALANCED assessment. Do NOT only praise the developer.
+- Highlight genuine strengths with specific evidence
+- Also identify concrete weaknesses, gaps, or areas for improvement
+- If the developer repeats similar projects without expanding skills, note the lack of breadth
+- If testing, documentation, or DevOps practices are missing, explicitly mention these gaps
+- If commit messages are poor or collaboration signals are weak, state this factually
+- Frame weaknesses as constructive observations, not insults`;
+
 
 const OUTPUT_FORMAT = `## OUTPUT FORMAT
 Respond ONLY with valid JSON matching this exact schema.
@@ -71,6 +82,8 @@ export const profileAggregation = {
 ${ANTI_HALLUCINATION}
 
 ${SYNTHESIS_INSTRUCTIONS}
+
+${BALANCED_PERSPECTIVE}
 
 ${OUTPUT_FORMAT}
 

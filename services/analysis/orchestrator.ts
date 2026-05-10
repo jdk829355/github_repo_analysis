@@ -14,6 +14,33 @@ import { publishEvent } from '../../workers/analysis-worker';
 
 const prisma = new PrismaClient();
 
+type CachedRepository = {
+  id: string;
+  name: string;
+  full_name: string;
+  description: string | null;
+  primary_language: string | null;
+  stars: number;
+  forks: number;
+  is_fork: boolean;
+  is_archived: boolean;
+  updated_at: Date;
+  repository_analyses: Array<{
+    repository_name: string;
+    summary: string;
+    project_type: string;
+    estimated_roles: string[];
+    main_contributions: string[];
+    tech_stack: string[];
+    leadership_signals: string[];
+    confidence: number;
+  }>;
+};
+
+function repoCacheKey(repo: { full_name?: string; name: string }): string {
+  return (repo.full_name || repo.name).toLowerCase();
+}
+
 const githubClientWithGetRepository = {
   ...githubClient,
   getRepository: githubClient.getRepository,
@@ -93,39 +120,56 @@ export async function runAnalysisPipeline(
       },
     });
 
+    const currentRepoKeys = new Set(repositories.map((repo) => repoCacheKey(repo)));
     const previousAnalyses = new Map<string, {
-      repository: { name: string; full_name: string; description: string | null; primary_language: string | null; stars: number; forks: number; is_fork: boolean; is_archived: boolean; updated_at: Date };
-      analysis: { repository_name: string; summary: string; project_type: string; estimated_roles: string[]; main_contributions: string[]; tech_stack: string[]; leadership_signals: string[]; confidence: number };
+      repository: CachedRepository;
+      analysis: CachedRepository['repository_analyses'][number];
     }>();
 
     if (previousJob) {
-      for (const repo of previousJob.repositories) {
+      const staleRepositoryIds: string[] = [];
+
+      for (const repo of previousJob.repositories as CachedRepository[]) {
+        if (!currentRepoKeys.has(repoCacheKey(repo))) {
+          staleRepositoryIds.push(repo.id);
+          continue;
+        }
+
         const analysis = repo.repository_analyses[0];
         if (analysis) {
-          previousAnalyses.set(repo.name, {
+          previousAnalyses.set(repoCacheKey(repo), {
             repository: repo,
             analysis: analysis,
           });
         }
       }
+
+      if (staleRepositoryIds.length > 0) {
+        await prisma.repository_analyses.deleteMany({
+          where: { repository_id: { in: staleRepositoryIds } },
+        });
+        await prisma.repositories.deleteMany({
+          where: { id: { in: staleRepositoryIds } },
+        });
+      }
     }
 
     const reposToAnalyze: Repository[] = [];
     for (const repo of repositories) {
-      const previous = previousAnalyses.get(repo.name);
+      const previous = previousAnalyses.get(repoCacheKey(repo));
       if (previous) {
         const createdRepo = await prisma.repositories.create({
           data: {
             analysis_job_id: jobId,
-            name: previous.repository.name,
-            full_name: previous.repository.full_name,
+            name: repo.name,
+            full_name: repo.full_name,
             description: previous.analysis.summary,
-            primary_language: previous.repository.primary_language,
-            stars: previous.repository.stars,
-            forks: previous.repository.forks,
-            is_fork: previous.repository.is_fork,
-            is_archived: previous.repository.is_archived,
-            updated_at: previous.repository.updated_at,
+            primary_language: repo.language,
+            stars: repo.stargazers_count,
+            forks: repo.forks_count,
+            is_fork: repo.fork,
+            is_archived: repo.archived,
+            updated_at: new Date(repo.updated_at),
           },
         });
 
@@ -143,6 +187,10 @@ export async function runAnalysisPipeline(
           },
         });
 
+        await publishEvent(jobId, {
+          type: 'repo_analysis_started',
+          repo: repo.name,
+        });
         await publishEvent(jobId, {
           type: 'repo_analysis_completed',
           repo: repo.name,
@@ -199,6 +247,7 @@ export async function runAnalysisPipeline(
       where: { id: jobId },
       data: { status: 'COMPLETED', completed_at: new Date() },
     });
+    await cache.clearJobActive(githubUrl);
     await publishEvent(jobId, {
       type: 'stateChange',
       state: 'COMPLETED',

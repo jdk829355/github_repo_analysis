@@ -8,7 +8,7 @@ import {
   VERIFICATION_REPO_URL,
 } from '../../../lib/constants';
 import { getUserProfile, hasUserStarredRepository } from '../../../services/github-client';
-import { checkJobDeduplication, setJobActive } from '../../../services/cache';
+import { checkJobDeduplication, clearJobActive, setJobActive } from '../../../services/cache';
 import { analysisQueue } from '../../../workers/analysis-worker';
 
 const prisma = new PrismaClient();
@@ -94,12 +94,14 @@ export async function POST(request: NextRequest) {
         where: { id: existingJobId },
       });
 
-      if (job) {
+      if (job?.status === 'PENDING' || job?.status === 'PROCESSING') {
         return NextResponse.json(
           { jobId: job.id, status: job.status },
           { status: 200 }
         );
       }
+
+      await clearJobActive(normalizedUrl);
     }
 
     const job = await prisma.analysis_jobs.create({

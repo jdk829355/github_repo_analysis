@@ -165,6 +165,11 @@ export async function analyzeRepositoryPipeline(
   }
 
   try {
+    await deps.publishEvent(jobId, {
+      type: 'repo_analysis_started',
+      repo: repoName,
+    });
+
     const { repositories } = await deps.githubClient.getUserRepositories(username);
     let repository = resolveRepository(repositories as RepositoryResponse[], repoName);
 

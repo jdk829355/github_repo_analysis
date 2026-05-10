@@ -4,6 +4,10 @@ import { ANALYSIS_TIMEOUT_MS } from '../../../lib/constants';
 const mockAnalysisJobsCreate = jest.fn();
 const mockAnalysisJobsUpdate = jest.fn();
 const mockAnalysisJobsFindFirst = jest.fn();
+const mockRepositoriesCreate = jest.fn().mockResolvedValue({ id: 'repo-id' });
+const mockRepositoriesDeleteMany = jest.fn();
+const mockRepositoryAnalysesCreate = jest.fn().mockResolvedValue({ id: 'analysis-id' });
+const mockRepositoryAnalysesDeleteMany = jest.fn();
 
 jest.mock('@prisma/client', () => {
   const mockInstance = {
@@ -13,10 +17,12 @@ jest.mock('@prisma/client', () => {
       findFirst: mockAnalysisJobsFindFirst,
     },
     repositories: {
-      create: jest.fn().mockResolvedValue({ id: 'repo-id' }),
+      create: mockRepositoriesCreate,
+      deleteMany: mockRepositoriesDeleteMany,
     },
     repository_analyses: {
-      create: jest.fn().mockResolvedValue({ id: 'analysis-id' }),
+      create: mockRepositoryAnalysesCreate,
+      deleteMany: mockRepositoryAnalysesDeleteMany,
     },
   };
 
@@ -90,6 +96,8 @@ describe('services/analysis/orchestrator', () => {
     jest.clearAllMocks();
     jest.useRealTimers();
     mockAnalysisJobsFindFirst.mockResolvedValue(null);
+    mockRepositoriesCreate.mockResolvedValue({ id: 'repo-id' });
+    mockRepositoryAnalysesCreate.mockResolvedValue({ id: 'analysis-id' });
   });
 
   function setupMocks() {
@@ -179,7 +187,140 @@ describe('services/analysis/orchestrator', () => {
         jobId,
         expect.objectContaining({ type: 'job_complete', state: 'COMPLETED', jobId })
       );
-      expect(mockClearJobActive).not.toHaveBeenCalled();
+      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+    });
+
+    it('reuses cached analyses for still-pinned repos and deletes stale cached repos', async () => {
+      mockCheckJobDeduplication.mockResolvedValue(null);
+      mockAnalysisJobsCreate.mockResolvedValue({ id: jobId });
+      mockAnalysisJobsUpdate.mockResolvedValue({ id: jobId });
+      mockGetUserPinnedRepositories.mockResolvedValue({
+        repositories: [
+          {
+            id: 1,
+            name: 'repo-a',
+            full_name: 'testuser/repo-a',
+            language: 'TypeScript',
+            stargazers_count: 10,
+            forks_count: 1,
+            fork: false,
+            archived: false,
+            updated_at: '2024-01-01T00:00:00Z',
+            owner: 'testuser',
+          },
+          {
+            id: 2,
+            name: 'repo-c',
+            full_name: 'testuser/repo-c',
+            language: 'Go',
+            stargazers_count: 20,
+            forks_count: 2,
+            fork: false,
+            archived: false,
+            updated_at: '2024-02-01T00:00:00Z',
+            owner: 'testuser',
+          },
+        ],
+        filteredCount: 0,
+      });
+      mockAnalysisJobsFindFirst.mockResolvedValue({
+        id: 'previous-job',
+        repositories: [
+          {
+            id: 'old-repo-a',
+            name: 'repo-a',
+            full_name: 'testuser/repo-a',
+            description: null,
+            primary_language: 'TypeScript',
+            stars: 1,
+            forks: 0,
+            is_fork: false,
+            is_archived: false,
+            updated_at: new Date('2023-01-01T00:00:00Z'),
+            repository_analyses: [
+              {
+                repository_name: 'repo-a',
+                summary: 'cached summary',
+                project_type: 'web-app',
+                estimated_roles: ['Backend'],
+                main_contributions: ['API'],
+                tech_stack: ['TypeScript'],
+                leadership_signals: [],
+                confidence: 0.9,
+              },
+            ],
+          },
+          {
+            id: 'old-repo-b',
+            name: 'repo-b',
+            full_name: 'testuser/repo-b',
+            description: null,
+            primary_language: 'JavaScript',
+            stars: 1,
+            forks: 0,
+            is_fork: false,
+            is_archived: false,
+            updated_at: new Date('2023-01-01T00:00:00Z'),
+            repository_analyses: [
+              {
+                repository_name: 'repo-b',
+                summary: 'stale summary',
+                project_type: 'web-app',
+                estimated_roles: ['Frontend'],
+                main_contributions: ['UI'],
+                tech_stack: ['JavaScript'],
+                leadership_signals: [],
+                confidence: 0.7,
+              },
+            ],
+          },
+        ],
+      });
+      mockAnalyzeRepositoryPipeline.mockResolvedValue({
+        status: 'COMPLETED',
+        analysis: { repositoryName: 'repo-c' },
+      });
+      mockAggregateProfile.mockResolvedValue({
+        overallSummary: 'A skilled developer',
+      });
+
+      const { startAnalysis } = setupMocks();
+      await startAnalysis(username, githubUrl);
+
+      expect(mockRepositoryAnalysesDeleteMany).toHaveBeenCalledWith({
+        where: { repository_id: { in: ['old-repo-b'] } },
+      });
+      expect(mockRepositoriesDeleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['old-repo-b'] } },
+      });
+      expect(mockRepositoriesCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          analysis_job_id: jobId,
+          name: 'repo-a',
+          full_name: 'testuser/repo-a',
+          description: 'cached summary',
+        }),
+      });
+      expect(mockRepositoryAnalysesCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          repository_id: 'repo-id',
+          repository_name: 'repo-a',
+          summary: 'cached summary',
+        }),
+      });
+      expect(mockAnalyzeRepositoryPipeline).toHaveBeenCalledTimes(1);
+      expect(mockAnalyzeRepositoryPipeline).toHaveBeenCalledWith(
+        expect.objectContaining({ repoName: 'repo-c' }),
+        expect.any(Object)
+      );
+      expect(mockPublishEvent).toHaveBeenCalledWith(
+        jobId,
+        expect.objectContaining({ type: 'repo_analysis_started', repo: 'repo-a' })
+      );
+      expect(mockPublishEvent).toHaveBeenCalledWith(
+        jobId,
+        expect.objectContaining({ type: 'repo_analysis_completed', repo: 'repo-a' })
+      );
     });
   });
 

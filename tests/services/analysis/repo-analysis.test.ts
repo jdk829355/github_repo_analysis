@@ -9,7 +9,6 @@ describe('services/analysis/repo-analysis', () => {
   const mockGetRepositoryReadme = jest.fn();
   const mockGetRepositoryCommits = jest.fn();
   const mockAnalyzeRepository = jest.fn();
-  const mockSetCachedLLMOutput = jest.fn();
   const mockPublishEvent = jest.fn();
   const mockFilterCommits = jest.fn();
   const mockTruncateToMaxSize = jest.fn();
@@ -76,9 +75,6 @@ describe('services/analysis/repo-analysis', () => {
       llmClient: {
         analyzeRepository: mockAnalyzeRepository,
       },
-      cache: {
-        setCachedLLMOutput: mockSetCachedLLMOutput,
-      },
       publishEvent: mockPublishEvent,
       prisma: {
         repositories: {
@@ -124,7 +120,6 @@ describe('services/analysis/repo-analysis', () => {
       throw new Error('Expected analysis to complete');
     }
     expect(RepositoryAnalysisSchema.parse(result.analysis)).toEqual(baseAnalysis);
-    expect(mockSetCachedLLMOutput).toHaveBeenCalledWith('testuser', 'sample-repo', baseAnalysis);
     expect(mockPublishEvent).toHaveBeenCalledWith(
       'job-1',
       expect.objectContaining({ type: 'repo_analysis_started', repo: 'sample-repo' })

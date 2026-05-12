@@ -9,7 +9,6 @@ const mockProfileReportsFindUnique = jest.fn();
 const mockProfileReportsUpdate = jest.fn();
 const mockAnalysisJobsUpdate = jest.fn();
 const mockAggregateProfile = jest.fn();
-const mockSetCachedLLMOutput = jest.fn();
 const mockPublishEvent = jest.fn();
 
 describe('services/analysis/profile-aggregation', () => {
@@ -44,9 +43,6 @@ describe('services/analysis/profile-aggregation', () => {
       llmClient: {
         aggregateProfile: mockAggregateProfile,
       },
-      cache: {
-        setCachedLLMOutput: mockSetCachedLLMOutput,
-      },
       publishEvent: mockPublishEvent,
     };
   }
@@ -78,7 +74,7 @@ describe('services/analysis/profile-aggregation', () => {
     };
   }
 
-  it('aggregates completed analyses, caches, stores, and publishes event', async () => {
+  it('aggregates completed analyses, stores, and publishes event', async () => {
     mockRepositoriesFindMany.mockResolvedValue([{ id: 'repo-1' }]);
     mockRepositoryAnalysesFindMany.mockResolvedValue([
       createRepoAnalysis({ repository_name: 'repo-a' }),
@@ -101,7 +97,6 @@ describe('services/analysis/profile-aggregation', () => {
         expect.objectContaining({ repositoryName: 'repo-a' }),
       ],
     });
-    expect(mockSetCachedLLMOutput).toHaveBeenCalledWith('testuser', undefined, report);
     expect(mockProfileReportsCreate).toHaveBeenCalledWith({
       data: {
         analysis_job_id: 'job-1',

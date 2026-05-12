@@ -8,6 +8,7 @@ const mockRepositoriesCreate = jest.fn().mockResolvedValue({ id: 'repo-id' });
 const mockRepositoriesDeleteMany = jest.fn();
 const mockRepositoryAnalysesCreate = jest.fn().mockResolvedValue({ id: 'analysis-id' });
 const mockRepositoryAnalysesDeleteMany = jest.fn();
+const mockProfileReportsCreate = jest.fn().mockResolvedValue({ id: 'report-id' });
 
 jest.mock('@prisma/client', () => {
   const mockInstance = {
@@ -23,6 +24,9 @@ jest.mock('@prisma/client', () => {
     repository_analyses: {
       create: mockRepositoryAnalysesCreate,
       deleteMany: mockRepositoryAnalysesDeleteMany,
+    },
+    profile_reports: {
+      create: mockProfileReportsCreate,
     },
   };
 
@@ -98,6 +102,7 @@ describe('services/analysis/orchestrator', () => {
     mockAnalysisJobsFindFirst.mockResolvedValue(null);
     mockRepositoriesCreate.mockResolvedValue({ id: 'repo-id' });
     mockRepositoryAnalysesCreate.mockResolvedValue({ id: 'analysis-id' });
+    mockProfileReportsCreate.mockResolvedValue({ id: 'report-id' });
   });
 
   function setupMocks() {
@@ -236,7 +241,7 @@ describe('services/analysis/orchestrator', () => {
             forks: 0,
             is_fork: false,
             is_archived: false,
-            updated_at: new Date('2023-01-01T00:00:00Z'),
+            updated_at: new Date('2024-01-01T00:00:00Z'),
             repository_analyses: [
               {
                 repository_name: 'repo-a',
@@ -320,6 +325,119 @@ describe('services/analysis/orchestrator', () => {
       expect(mockPublishEvent).toHaveBeenCalledWith(
         jobId,
         expect.objectContaining({ type: 'repo_analysis_completed', repo: 'repo-a' })
+      );
+    });
+
+    it('reuses previous profile report when pinned repo full_name and updated_at are unchanged', async () => {
+      mockCheckJobDeduplication.mockResolvedValue(null);
+      mockAnalysisJobsCreate.mockResolvedValue({ id: jobId });
+      mockAnalysisJobsUpdate.mockResolvedValue({ id: jobId });
+      mockGetUserPinnedRepositories.mockResolvedValue({
+        repositories: [
+          {
+            id: 1,
+            name: 'repo-a',
+            full_name: 'testuser/repo-a',
+            language: 'TypeScript',
+            stargazers_count: 10,
+            forks_count: 1,
+            fork: false,
+            archived: false,
+            updated_at: '2024-01-01T00:00:00Z',
+            owner: 'testuser',
+          },
+          {
+            id: 2,
+            name: 'repo-b',
+            full_name: 'testuser/repo-b',
+            language: 'Go',
+            stargazers_count: 20,
+            forks_count: 2,
+            fork: false,
+            archived: false,
+            updated_at: '2024-02-01T00:00:00Z',
+            owner: 'testuser',
+          },
+        ],
+        filteredCount: 0,
+      });
+      mockAnalysisJobsFindFirst.mockResolvedValue({
+        id: 'previous-job',
+        profile_report: {
+          overall_summary: 'cached profile report',
+          role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
+          engineering_strengths: ['API design'],
+          collaboration_patterns: ['Code reviews'],
+        },
+        repositories: [
+          {
+            id: 'old-repo-a',
+            name: 'repo-a',
+            full_name: 'testuser/repo-a',
+            description: null,
+            primary_language: 'TypeScript',
+            stars: 10,
+            forks: 1,
+            is_fork: false,
+            is_archived: false,
+            updated_at: new Date('2024-01-01T00:00:00Z'),
+            repository_analyses: [
+              {
+                repository_name: 'repo-a',
+                summary: 'repo-a summary',
+                project_type: 'web-app',
+                estimated_roles: ['Backend'],
+                main_contributions: ['API'],
+                tech_stack: ['TypeScript'],
+                leadership_signals: [],
+                confidence: 0.9,
+              },
+            ],
+          },
+          {
+            id: 'old-repo-b',
+            name: 'repo-b',
+            full_name: 'testuser/repo-b',
+            description: null,
+            primary_language: 'Go',
+            stars: 20,
+            forks: 2,
+            is_fork: false,
+            is_archived: false,
+            updated_at: new Date('2024-02-01T00:00:00Z'),
+            repository_analyses: [
+              {
+                repository_name: 'repo-b',
+                summary: 'repo-b summary',
+                project_type: 'service',
+                estimated_roles: ['Backend'],
+                main_contributions: ['Worker'],
+                tech_stack: ['Go'],
+                leadership_signals: [],
+                confidence: 0.8,
+              },
+            ],
+          },
+        ],
+      });
+
+      const { startAnalysis } = setupMocks();
+      await startAnalysis(username, githubUrl);
+
+      expect(mockAnalyzeRepositoryPipeline).not.toHaveBeenCalled();
+      expect(mockAggregateProfile).not.toHaveBeenCalled();
+      expect(mockProfileReportsCreate).toHaveBeenCalledWith({
+        data: {
+          analysis_job_id: jobId,
+          overall_summary: 'cached profile report',
+          role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
+          engineering_strengths: ['API design'],
+          collaboration_patterns: ['Code reviews'],
+        },
+      });
+      expect(mockPublishEvent).toHaveBeenCalledWith(
+        jobId,
+        { type: 'aggregation_complete', reused: true }
       );
     });
   });

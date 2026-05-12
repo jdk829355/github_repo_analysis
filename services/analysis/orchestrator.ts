@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { ANALYSIS_TIMEOUT_MS } from '../../lib/constants';
 import { AnalysisError } from '../../lib/errors';
 import { truncateToMaxSize } from '../../lib/utils';
@@ -37,8 +37,29 @@ type CachedRepository = {
   }>;
 };
 
+type CachedProfileReport = {
+  overall_summary: string;
+  role_estimation: unknown;
+  engineering_strengths: string[];
+  collaboration_patterns: string[];
+};
+
 function repoCacheKey(repo: { full_name?: string; name: string }): string {
   return (repo.full_name || repo.name).toLowerCase();
+}
+
+function normalizeUpdatedAt(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function buildProfileFingerprint(
+  repos: Array<{ full_name?: string; name: string; updated_at: string | Date }>
+): string {
+  return repos
+    .map((repo) => `${repoCacheKey(repo)}@${normalizeUpdatedAt(repo.updated_at)}`)
+    .sort()
+    .join('|');
 }
 
 const githubClientWithGetRepository = {
@@ -50,7 +71,6 @@ function createRepoAnalysisDeps(): RepoAnalysisDeps {
   return {
     githubClient: githubClientWithGetRepository,
     llmClient,
-    cache,
     publishEvent: async (jobId: string, event: Record<string, unknown>) => {
       await publishEvent(jobId, event);
     },
@@ -77,6 +97,7 @@ export async function runAnalysisPipeline(
     });
 
     const { repositories } = await githubClient.getUserPinnedRepositories(username);
+    const currentFingerprint = buildProfileFingerprint(repositories);
 
     if (repositories.length === 0) {
       await prisma.analysis_jobs.update({
@@ -112,6 +133,7 @@ export async function runAnalysisPipeline(
       },
       orderBy: { created_at: 'desc' },
       include: {
+        profile_report: true,
         repositories: {
           include: {
             repository_analyses: true,
@@ -121,23 +143,34 @@ export async function runAnalysisPipeline(
     });
 
     const currentRepoKeys = new Set(repositories.map((repo) => repoCacheKey(repo)));
+    const currentRepoUpdatedAt = new Map(
+      repositories.map((repo) => [repoCacheKey(repo), normalizeUpdatedAt(repo.updated_at)])
+    );
     const previousAnalyses = new Map<string, {
       repository: CachedRepository;
       analysis: CachedRepository['repository_analyses'][number];
     }>();
+    let canReuseProfileReport = false;
+    let previousProfileReport: CachedProfileReport | null = null;
 
     if (previousJob) {
       const staleRepositoryIds: string[] = [];
+      const previousRepositories = previousJob.repositories as CachedRepository[];
+      const previousFingerprint = buildProfileFingerprint(previousRepositories);
+      previousProfileReport = previousJob.profile_report as CachedProfileReport | null;
+      canReuseProfileReport = Boolean(previousProfileReport)
+        && previousFingerprint === currentFingerprint;
 
-      for (const repo of previousJob.repositories as CachedRepository[]) {
-        if (!currentRepoKeys.has(repoCacheKey(repo))) {
+      for (const repo of previousRepositories) {
+        const key = repoCacheKey(repo);
+        if (!currentRepoKeys.has(key)) {
           staleRepositoryIds.push(repo.id);
           continue;
         }
 
         const analysis = repo.repository_analyses[0];
-        if (analysis) {
-          previousAnalyses.set(repoCacheKey(repo), {
+        if (analysis && currentRepoUpdatedAt.get(key) === normalizeUpdatedAt(repo.updated_at)) {
+          previousAnalyses.set(key, {
             repository: repo,
             analysis: analysis,
           });
@@ -217,17 +250,29 @@ export async function runAnalysisPipeline(
         );
       }
 
-      await aggregateProfile(
-        { username, jobId },
-        {
-          prisma,
-          llmClient: { aggregateProfile: llmClient.aggregateProfile },
-          cache: { setCachedLLMOutput: cache.setCachedLLMOutput },
-          publishEvent: async (eventJobId, event) => {
-            await publishEvent(eventJobId, event);
+      if (canReuseProfileReport && previousProfileReport) {
+        await prisma.profile_reports.create({
+          data: {
+            analysis_job_id: jobId,
+            overall_summary: previousProfileReport.overall_summary,
+            role_estimation: previousProfileReport.role_estimation as Prisma.InputJsonValue,
+            engineering_strengths: previousProfileReport.engineering_strengths,
+            collaboration_patterns: previousProfileReport.collaboration_patterns,
           },
-        }
-      );
+        });
+        await publishEvent(jobId, { type: 'aggregation_complete', reused: true });
+      } else {
+        await aggregateProfile(
+          { username, jobId },
+          {
+            prisma,
+            llmClient: { aggregateProfile: llmClient.aggregateProfile },
+            publishEvent: async (eventJobId, event) => {
+              await publishEvent(eventJobId, event);
+            },
+          }
+        );
+      }
     };
 
     const timeoutPromise = new Promise<never>((_, reject) => {

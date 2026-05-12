@@ -1,10 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { ProfileReportSchema, type ProfileReport } from '../../schemas/profile-report';
 import { RoleSchema } from '../../prompts/types';
-import type { ProfileAggregationInput, Role, RepositoryAnalysis } from '../../prompts/types';
+import type { ProfileAggregationInput, RepositoryAnalysis } from '../../prompts/types';
 import { AnalysisError } from '../../lib/errors';
 import { aggregateProfile as aggregateWithLlm } from '../llm-client';
-import { setCachedLLMOutput } from '../cache';
 
 type PrismaRepositoriesClient = {
   findMany: (args: {
@@ -28,39 +27,16 @@ type PrismaRepositoryAnalysesClient = {
   }>>;
 };
 
-type PrismaProfileReportsClient = {
-  create: (args: {
-    data: {
-      analysis_job_id: string;
-      overall_summary: string;
-      role_estimation: Record<string, unknown>;
-      engineering_strengths: string[];
-      collaboration_patterns: string[];
-    };
-  }) => Promise<{ id: string }>;
-};
-
-type PrismaAnalysisJobsClient = {
-  update: (args: {
-    where: { id: string };
-    data: { status: 'FAILED' | 'COMPLETED'; error_message?: string | null };
-  }) => Promise<{ id: string }>;
-};
-
 export type AggregationDeps = {
   prisma: PrismaClient;
   llmClient: {
     aggregateProfile: typeof aggregateWithLlm;
-  };
-  cache: {
-    setCachedLLMOutput: typeof setCachedLLMOutput;
   };
   publishEvent: (jobId: string, event: Record<string, unknown>) => Promise<void>;
 };
 
 const DEFAULT_DEPS: Omit<AggregationDeps, 'prisma'> = {
   llmClient: { aggregateProfile: aggregateWithLlm },
-  cache: { setCachedLLMOutput },
   publishEvent: async (jobId, event) => {
     const worker = await import('../../workers/analysis-worker');
     return worker.publishEvent(jobId, event);
@@ -78,7 +54,6 @@ export async function aggregateProfile(
 
   const prisma = resolvedDeps.prisma;
   const llmClient = resolvedDeps.llmClient ?? DEFAULT_DEPS.llmClient;
-  const cache = resolvedDeps.cache ?? DEFAULT_DEPS.cache;
   const publishEvent = resolvedDeps.publishEvent ?? DEFAULT_DEPS.publishEvent;
 
   const repositoriesClient = prisma.repositories as unknown as PrismaRepositoriesClient;
@@ -138,8 +113,6 @@ export async function aggregateProfile(
   try {
     const report = await llmClient.aggregateProfile(payload);
     const validated = ProfileReportSchema.parse(report);
-
-    await cache.setCachedLLMOutput(input.username, undefined, validated);
 
     await prisma.profile_reports.create({
       data: {

@@ -8,7 +8,6 @@ import type { RepositoryAnalysisInput } from '../../prompts/types';
 import type { GitHubAPIError } from '../../lib/errors';
 import * as githubClient from '../github-client';
 import * as llmClient from '../llm-client';
-import * as cacheService from '../cache';
 
 type CommitResponse = {
   sha: string;
@@ -78,9 +77,6 @@ export type RepoAnalysisDeps = {
   llmClient: {
     analyzeRepository: typeof llmClient.analyzeRepository;
   };
-  cache: {
-    setCachedLLMOutput: typeof cacheService.setCachedLLMOutput;
-  };
   publishEvent: (jobId: string, event: Record<string, unknown>) => Promise<void>;
   prisma: PrismaClient | null;
   filterCommits: typeof defaultFilterCommits;
@@ -113,7 +109,6 @@ function createDefaultDeps(): RepoAnalysisDeps {
   return {
     githubClient,
     llmClient,
-    cache: cacheService,
     publishEvent: async (jobId: string, event: Record<string, unknown>) => {
       const worker = await import('../../workers/analysis-worker');
       return worker.publishEvent(jobId, event);
@@ -219,8 +214,6 @@ export async function analyzeRepositoryPipeline(
 
     const analysis = await deps.llmClient.analyzeRepository(analysisInput);
     const validated = RepositoryAnalysisSchema.parse(analysis);
-
-    await deps.cache.setCachedLLMOutput(username, repoName, validated);
 
     const createdRepo = await deps.prisma.repositories.create({
       data: {

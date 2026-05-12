@@ -29,6 +29,7 @@ jobs:
       - name: Deploy
         run: |
           ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            git config --global --add safe.directory /home/jdk829355/github_repo_analysis
             set -e
             cd /home/jdk829355/github_repo_analysis
             git pull origin main

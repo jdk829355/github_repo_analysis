@@ -9,6 +9,7 @@ import { setJobRepoList } from '../cache';
 import * as githubClient from '../github-client';
 import type { Repository } from '../github-client';
 import * as llmClient from '../llm-client';
+import { renderWidgetSvgVariants } from '../widget-export';
 import { analyzeRepositoryPipeline, type RepoAnalysisDeps } from './repo-analysis';
 import { aggregateProfile } from './profile-aggregation';
 import { publishEvent } from '../../workers/analysis-worker';
@@ -256,6 +257,21 @@ export async function runAnalysisPipeline(
       }
 
       if (canReuseProfileReport && previousProfileReport) {
+        const widgetSvgs = renderWidgetSvgVariants({
+          githubUsername: username,
+          overallSummary: previousProfileReport.overall_summary,
+          roleEstimation: previousProfileReport.role_estimation as {
+            primary: string;
+            secondary: string[];
+            recommended: string[];
+          },
+          greenFlags: previousProfileReport.green_flags || [],
+          redFlags: previousProfileReport.red_flags || [],
+          repositories: repositories.map((repo) => ({
+            language: repo.language || '',
+          })),
+        });
+
         await prisma.profile_reports.create({
           data: {
             analysis_job_id: jobId,
@@ -265,6 +281,9 @@ export async function runAnalysisPipeline(
             collaboration_patterns: previousProfileReport.collaboration_patterns,
             green_flags: previousProfileReport.green_flags || [],
             red_flags: previousProfileReport.red_flags || [],
+            widget_svg_light: widgetSvgs.light,
+            widget_svg_dark: widgetSvgs.dark,
+            widget_svg_updated_at: new Date(),
           },
         });
         await publishEvent(jobId, { type: 'aggregation_complete', reused: true });

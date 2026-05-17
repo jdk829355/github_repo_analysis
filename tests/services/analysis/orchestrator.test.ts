@@ -429,7 +429,7 @@ describe('services/analysis/orchestrator', () => {
       expect(mockAnalyzeRepositoryPipeline).not.toHaveBeenCalled();
       expect(mockAggregateProfile).not.toHaveBeenCalled();
       expect(mockProfileReportsCreate).toHaveBeenCalledWith({
-        data: {
+        data: expect.objectContaining({
           analysis_job_id: jobId,
           overall_summary: 'cached profile report',
           role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
@@ -437,7 +437,10 @@ describe('services/analysis/orchestrator', () => {
           collaboration_patterns: ['Code reviews'],
           green_flags: ['API design evidence'],
           red_flags: ['Limited testing evidence'],
-        },
+          widget_svg_light: expect.stringContaining('<svg'),
+          widget_svg_dark: expect.stringContaining('<svg'),
+          widget_svg_updated_at: expect.any(Date),
+        }),
       });
       expect(mockPublishEvent).toHaveBeenCalledWith(
         jobId,

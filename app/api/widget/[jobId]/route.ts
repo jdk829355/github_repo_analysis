@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
-import { renderWidgetSvg, type WidgetReport } from '../../../../services/widget-export';
+import {
+  WIDGET_SVG_VERSION,
+  renderWidgetSvgVariants,
+  type WidgetReport,
+  type WidgetTheme,
+} from '../../../../services/widget-export';
 
 interface RouteParams {
   params: Promise<{ jobId: string }>;
@@ -15,8 +20,8 @@ function getGitHubUsername(githubProfile: string): string {
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
-  void request;
   const { jobId } = await params;
+  const theme = getWidgetTheme(request.url);
 
   const job = await prisma.analysis_jobs.findUnique({
     where: { id: jobId },
@@ -35,7 +40,15 @@ export async function GET(request: Request, { params }: RouteParams) {
     });
   }
 
-  const report: WidgetReport = {
+  const storedSvg = theme === 'dark'
+    ? job.profile_report.widget_svg_dark
+    : job.profile_report.widget_svg_light;
+
+  if (storedSvg?.includes(`data-widget-version="${WIDGET_SVG_VERSION}"`)) {
+    return svgResponse(storedSvg);
+  }
+
+  const variants = renderWidgetSvgVariants({
     githubUsername: getGitHubUsername(job.github_profile),
     overallSummary: job.profile_report.overall_summary,
     roleEstimation: job.profile_report.role_estimation as unknown as WidgetReport['roleEstimation'],
@@ -44,9 +57,27 @@ export async function GET(request: Request, { params }: RouteParams) {
     repositories: (job.repositories || []).map((repository) => ({
       language: repository.primary_language || '',
     })),
-  };
+  });
 
-  return new NextResponse(renderWidgetSvg(report), {
+  await prisma.profile_reports.update({
+    where: { analysis_job_id: jobId },
+    data: {
+      widget_svg_light: variants.light,
+      widget_svg_dark: variants.dark,
+      widget_svg_updated_at: new Date(),
+    },
+  });
+
+  return svgResponse(theme === 'dark' ? variants.dark : variants.light);
+}
+
+function getWidgetTheme(url: string): WidgetTheme {
+  const value = new URL(url).searchParams.get('theme');
+  return value === 'dark' ? 'dark' : 'light';
+}
+
+function svgResponse(svg: string) {
+  return new NextResponse(svg, {
     status: 200,
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',

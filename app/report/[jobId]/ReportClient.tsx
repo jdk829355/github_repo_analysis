@@ -151,6 +151,7 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
   const [origin, setOrigin] = useState('');
   const [copied, setCopied] = useState(false);
   const [previewNonce, setPreviewNonce] = useState(0);
+  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -169,10 +170,13 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
   }, [open]);
 
   const widgetUrl = origin ? `${origin}/api/widget/${jobId}` : '';
-  const previewUrl = widgetUrl && previewNonce ? `${widgetUrl}?preview=${previewNonce}` : widgetUrl;
+  const themedWidgetUrl = widgetUrl ? `${widgetUrl}?theme=${widgetTheme}` : '';
+  const previewUrl = themedWidgetUrl && previewNonce
+    ? `${themedWidgetUrl}&preview=${previewNonce}`
+    : themedWidgetUrl;
   const reportUrl = origin ? `${origin}/report/${jobId}` : '';
-  const markdownCode = widgetUrl && reportUrl
-    ? `[![Pinned Signal profile widget](${widgetUrl})](${reportUrl})`
+  const markdownCode = themedWidgetUrl && reportUrl
+    ? `[![Pinned Signal profile widget](${themedWidgetUrl})](${reportUrl})`
     : '';
 
   async function copyMarkdownCode() {
@@ -224,7 +228,7 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
             </div>
             {widgetUrl && (
               <a
-                href={widgetUrl}
+                href={themedWidgetUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-md border border-[#c1c6d5] px-3 py-1.5 text-xs font-semibold text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
@@ -232,6 +236,25 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
                 새 창에서 보기
               </a>
             )}
+          </div>
+          <div className="mb-3 inline-flex rounded-lg border border-[#c1c6d5] bg-[#f9f9ff] p-1">
+            {(['light', 'dark'] as const).map((theme) => (
+              <button
+                key={theme}
+                type="button"
+                onClick={() => {
+                  setWidgetTheme(theme);
+                  setPreviewNonce(Date.now());
+                }}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  widgetTheme === theme
+                    ? 'bg-[#005ab4] text-white'
+                    : 'text-[#414753] hover:bg-[#e0e2eb] hover:text-[#181c22]'
+                }`}
+              >
+                {theme === 'light' ? '라이트' : '다크'}
+              </button>
+            ))}
           </div>
           {widgetUrl && (
             <img

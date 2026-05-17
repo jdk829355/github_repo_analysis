@@ -100,7 +100,7 @@ describe('services/analysis/profile-aggregation', () => {
       ],
     });
     expect(mockProfileReportsCreate).toHaveBeenCalledWith({
-      data: {
+      data: expect.objectContaining({
         analysis_job_id: 'job-1',
         overall_summary: report.overallSummary,
         role_estimation: report.roleEstimation,
@@ -108,7 +108,10 @@ describe('services/analysis/profile-aggregation', () => {
         collaboration_patterns: report.collaborationPatterns,
         green_flags: report.greenFlags,
         red_flags: report.redFlags,
-      },
+        widget_svg_light: expect.stringContaining('<svg'),
+        widget_svg_dark: expect.stringContaining('<svg'),
+        widget_svg_updated_at: expect.any(Date),
+      }),
     });
     expect(mockPublishEvent).toHaveBeenCalledWith('job-1', { type: 'aggregation_complete' });
   });
@@ -175,7 +178,7 @@ describe('services/analysis/profile-aggregation', () => {
       data: { status: 'FAILED', error_message: 'LLM failed' },
     });
     expect(mockProfileReportsCreate).toHaveBeenCalledWith({
-      data: {
+      data: expect.objectContaining({
         analysis_job_id: 'job-1',
         overall_summary: 'aggregation_failed',
         role_estimation: {
@@ -187,7 +190,10 @@ describe('services/analysis/profile-aggregation', () => {
         collaboration_patterns: [],
         green_flags: ['Repo summary'],
         red_flags: ['프로필 집계에 실패하여 비판적 신호를 충분히 도출하지 못했습니다.'],
-      },
+        widget_svg_light: expect.stringContaining('<svg'),
+        widget_svg_dark: expect.stringContaining('<svg'),
+        widget_svg_updated_at: expect.any(Date),
+      }),
     });
     expect(mockPublishEvent).toHaveBeenCalledWith('job-1', {
       type: 'aggregation_failed',

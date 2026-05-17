@@ -76,6 +76,9 @@ model profile_reports {
   collaboration_patterns String[]
   green_flags           String[] @default([])
   red_flags             String[] @default([])
+  widget_svg_light      String?
+  widget_svg_dark       String?
+  widget_svg_updated_at DateTime?
   created_at            DateTime @default(now())
 
   analysis_job          analysis_jobs @relation(fields: [analysis_job_id], references: [id])

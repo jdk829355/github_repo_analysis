@@ -4,12 +4,13 @@ import { RoleSchema } from '../../prompts/types';
 import type { ProfileAggregationInput, RepositoryAnalysis } from '../../prompts/types';
 import { AnalysisError } from '../../lib/errors';
 import { aggregateProfile as aggregateWithLlm } from '../llm-client';
+import { renderWidgetSvgVariants } from '../widget-export';
 
 type PrismaRepositoriesClient = {
   findMany: (args: {
     where: { analysis_job_id: string };
-    select: { id: true };
-  }) => Promise<Array<{ id: string }>>;
+    select: { id: true; primary_language: true };
+  }) => Promise<Array<{ id: string; primary_language: string | null }>>;
 };
 
 type PrismaRepositoryAnalysesClient = {
@@ -61,7 +62,7 @@ export async function aggregateProfile(
 
   const repositoryIds = await repositoriesClient.findMany({
     where: { analysis_job_id: input.jobId },
-    select: { id: true },
+    select: { id: true, primary_language: true },
   });
 
   if (repositoryIds.length === 0) {
@@ -113,6 +114,16 @@ export async function aggregateProfile(
   try {
     const report = await llmClient.aggregateProfile(payload);
     const validated = ProfileReportSchema.parse(report);
+    const widgetSvgs = renderWidgetSvgVariants({
+      githubUsername: input.username,
+      overallSummary: validated.overallSummary,
+      roleEstimation: validated.roleEstimation,
+      greenFlags: validated.greenFlags,
+      redFlags: validated.redFlags,
+      repositories: repositoryIds.map((repository) => ({
+        language: repository.primary_language || '',
+      })),
+    });
 
     await prisma.profile_reports.create({
       data: {
@@ -123,6 +134,9 @@ export async function aggregateProfile(
         collaboration_patterns: validated.collaborationPatterns,
         green_flags: validated.greenFlags,
         red_flags: validated.redFlags,
+        widget_svg_light: widgetSvgs.light,
+        widget_svg_dark: widgetSvgs.dark,
+        widget_svg_updated_at: new Date(),
       },
     });
 
@@ -155,17 +169,33 @@ export async function aggregateProfile(
       green_flags: completedAnalyses.map((analysis) => analysis.summary),
       red_flags: ['프로필 집계에 실패하여 비판적 신호를 충분히 도출하지 못했습니다.'],
     };
+    const fallbackWidgetSvgs = renderWidgetSvgVariants({
+      githubUsername: input.username,
+      overallSummary: fallbackData.overall_summary,
+      roleEstimation: fallbackData.role_estimation,
+      greenFlags: fallbackData.green_flags,
+      redFlags: fallbackData.red_flags,
+      repositories: repositoryIds.map((repository) => ({
+        language: repository.primary_language || '',
+      })),
+    });
+    const fallbackReportData = {
+      ...fallbackData,
+      widget_svg_light: fallbackWidgetSvgs.light,
+      widget_svg_dark: fallbackWidgetSvgs.dark,
+      widget_svg_updated_at: new Date(),
+    };
 
     if (existingReport) {
       await prisma.profile_reports.update({
         where: { analysis_job_id: input.jobId },
-        data: fallbackData,
+        data: fallbackReportData,
       });
     } else {
       await prisma.profile_reports.create({
         data: {
           analysis_job_id: input.jobId,
-          ...fallbackData,
+          ...fallbackReportData,
         },
       });
     }

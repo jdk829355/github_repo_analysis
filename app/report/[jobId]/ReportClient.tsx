@@ -150,6 +150,7 @@ function FlagList({ title, items, tone }: { title: string; items: string[]; tone
 function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: boolean; onClose: () => void }) {
   const [origin, setOrigin] = useState('');
   const [copied, setCopied] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -157,6 +158,7 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
 
   useEffect(() => {
     if (open) {
+      setPreviewNonce(Date.now());
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -166,18 +168,20 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
     };
   }, [open]);
 
-  const widgetUrl = origin ? `${origin}/widget/${jobId}` : '';
-  const iframeCode = widgetUrl
-    ? `<iframe src="${widgetUrl}" width="920" height="760" style="width:100%;max-width:920px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" title="Pinned Signal profile widget"></iframe>`
+  const widgetUrl = origin ? `${origin}/api/widget/${jobId}` : '';
+  const previewUrl = widgetUrl && previewNonce ? `${widgetUrl}?preview=${previewNonce}` : widgetUrl;
+  const reportUrl = origin ? `${origin}/report/${jobId}` : '';
+  const markdownCode = widgetUrl && reportUrl
+    ? `[![Pinned Signal profile widget](${widgetUrl})](${reportUrl})`
     : '';
 
-  async function copyIframeCode() {
-    if (!iframeCode) return;
+  async function copyMarkdownCode() {
+    if (!markdownCode) return;
     try {
-      await navigator.clipboard.writeText(iframeCode);
+      await navigator.clipboard.writeText(markdownCode);
     } catch (error) {
       const textarea = document.createElement('textarea');
-      textarea.value = iframeCode;
+      textarea.value = markdownCode;
       textarea.setAttribute('readonly', 'true');
       textarea.style.position = 'fixed';
       textarea.style.opacity = '0';
@@ -197,7 +201,7 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-[960px] flex-col gap-4 overflow-auto rounded-2xl bg-[#f1f3fc] p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold leading-8 text-[#181c22]">HTML 위젯 보내기</h2>
+          <h2 className="text-2xl font-semibold leading-8 text-[#181c22]">SVG 위젯 내보내기</h2>
           <button
             type="button"
             onClick={onClose}
@@ -213,9 +217,9 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
         <div className="rounded-lg border border-[#d9deea] bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold leading-6 text-[#181c22]">Detailed Card iframe</h3>
+              <h3 className="text-base font-semibold leading-6 text-[#181c22]">Detailed Card SVG</h3>
               <p className="mt-1 text-xs leading-5 text-[#414753]">
-                외부 페이지나 블로그에 붙여 넣을 수 있는 HTML iframe 위젯입니다.
+                GitHub README에 붙여 넣을 수 있는 SVG 이미지 위젯입니다.
               </p>
             </div>
             {widgetUrl && (
@@ -230,28 +234,29 @@ function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: bool
             )}
           </div>
           {widgetUrl && (
-            <iframe
-              src={widgetUrl}
+            <img
+              src={previewUrl}
+              alt="Pinned Signal profile widget preview"
               title="Pinned Signal profile widget preview"
               loading="lazy"
-              className="h-[760px] w-full max-w-[920px] rounded-2xl border-0 bg-[#f9f9ff]"
+              className="h-auto w-full max-w-[920px] rounded-2xl bg-[#f9f9ff]"
             />
           )}
         </div>
 
         <div className="rounded-lg border border-[#d9deea] bg-[#181c22] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#d9deea]">HTML</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#d9deea]">Markdown</span>
             <button
               type="button"
-              onClick={copyIframeCode}
+              onClick={copyMarkdownCode}
               className="rounded-md border border-[#717785] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-white focus:outline-none focus:ring-2 focus:ring-white"
             >
               {copied ? '복사됨' : '복사'}
             </button>
           </div>
           <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#f9f9ff]">
-            {iframeCode || 'iframe 코드를 준비하는 중입니다...'}
+            {markdownCode || 'Markdown 코드를 준비하는 중입니다...'}
           </pre>
         </div>
       </div>
@@ -437,7 +442,7 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
             <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
             </svg>
-            <span>HTML 위젯보내기</span>
+            <span>SVG 위젯 내보내기</span>
           </button>
           <a
             href={`/api/report/${jobId}/pdf`}

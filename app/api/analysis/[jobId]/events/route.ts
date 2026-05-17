@@ -1,11 +1,9 @@
 import { NextRequest } from 'next/server';
 import Redis from 'ioredis';
-import { PrismaClient } from '@prisma/client';
 import { getRedisUrl } from '../../../../../lib/config';
+import { prisma } from '../../../../../lib/prisma';
 import { getJobRepoList } from '../../../../../services/cache';
 import { getJobState, getEventChannel } from '../../../../../workers/analysis-worker';
-
-const prisma = new PrismaClient();
 
 const TERMINAL_EVENTS = [
   'job_complete',

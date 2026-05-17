@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../lib/prisma';
 import ReportClient from './ReportClient';
 
 interface RoleEstimation {
@@ -65,8 +65,6 @@ interface PageProps {
 }
 
 async function getReport(jobId: string) {
-  const prisma = new PrismaClient();
-
   const job = await prisma.analysis_jobs.findUnique({
     where: { id: jobId },
     include: {

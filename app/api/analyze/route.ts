@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../lib/prisma';
 import { normalizeGitHubUrl } from '../../../lib/utils';
 import { GitHubAPIError } from '../../../lib/errors';
 import {
@@ -10,8 +10,6 @@ import {
 import { getUserProfile, hasUserStarredRepository } from '../../../services/github-client';
 import { checkJobDeduplication, clearJobActive, setJobActive } from '../../../services/cache';
 import { analysisQueue } from '../../../workers/analysis-worker';
-
-const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {

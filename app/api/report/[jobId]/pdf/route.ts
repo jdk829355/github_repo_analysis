@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../../../lib/prisma';
 import { generateReportPdf, type PdfReport } from '../../../../../services/pdf-export';
-
-const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,

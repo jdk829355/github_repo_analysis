@@ -1,8 +1,9 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { ANALYSIS_TIMEOUT_MS } from '../../lib/constants';
 import { AnalysisError } from '../../lib/errors';
 import { truncateToMaxSize } from '../../lib/utils';
 import { filterCommits } from '../../lib/commit-filter';
+import { prisma } from '../../lib/prisma';
 import * as cache from '../cache';
 import { setJobRepoList } from '../cache';
 import * as githubClient from '../github-client';
@@ -11,8 +12,6 @@ import * as llmClient from '../llm-client';
 import { analyzeRepositoryPipeline, type RepoAnalysisDeps } from './repo-analysis';
 import { aggregateProfile } from './profile-aggregation';
 import { publishEvent } from '../../workers/analysis-worker';
-
-const prisma = new PrismaClient();
 
 type CachedRepository = {
   id: string;

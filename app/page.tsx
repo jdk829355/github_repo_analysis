@@ -2,8 +2,8 @@ import UrlInput from "@/components/UrlInput";
 
 const featureCards = [
   {
-    title: "심층 분석",
-    description: "커밋 히스토리와 기여도를 바탕으로 한 정밀한 인사이트 도출.",
+    title: "저장소 분석",
+    description: "리드미, 커밋 기록, 스타 수, 포크 수를 분석하여 프로젝트 유형과 기여도를 파악해요.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V5m0 14h16M8 16v-5m4 5V8m4 8v-3" />
@@ -11,8 +11,8 @@ const featureCards = [
     ),
   },
   {
-    title: "스킬셋 매핑",
-    description: "사용된 언어와 프레임워크를 시각화하여 강점을 파악.",
+    title: "기술 스택 분석",
+    description: "사용된 언어와 프레임워크를 시각화하여 강점을 파악해요.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l-4 3 4 3m8-6l4 3-4 3M13 5l-2 14" />
@@ -20,8 +20,8 @@ const featureCards = [
     ),
   },
   {
-    title: "프로젝트 리뷰",
-    description: "주요 프로젝트의 아키텍처와 해결 과제를 요약 제공.",
+    title: "프로필 요약",
+    description: "분석 정보를 종합해서 프로필에 대한 분석을 제공해요.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10 6h4m-7 4h10M7 14h6m-8 6h14a2 2 0 002-2V8a2 2 0 00-2-2h-3.5L14 4h-4L8.5 6H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

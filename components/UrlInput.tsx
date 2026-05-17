@@ -165,7 +165,8 @@ export default function UrlInput() {
                 >
                   github_repo_analysis
                 </a>
-                에 star를 남긴 뒤 검증을 진행하세요. star 목록에서 해당 계정이 확인되면 분석이 시작됩니다.
+                에 star를 남긴 뒤 검증을 진행하세요. 
+                star 목록에서 해당 계정이 확인되면 분석이 시작됩니다.
               </p>
             </div>
             <button

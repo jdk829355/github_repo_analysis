@@ -5,6 +5,7 @@ interface RoleEstimation {
 }
 
 export interface WidgetReport {
+  githubUsername: string;
   overallSummary: string;
   roleEstimation: RoleEstimation;
   greenFlags: string[];
@@ -108,6 +109,7 @@ function renderFlagItems(items: string[], x: number, y: number, markerFill: stri
 
 export function renderWidgetSvg(report: WidgetReport): string {
   const primaryRole = report.roleEstimation.primary || 'Developer';
+  const profileTitle = report.githubUsername ? `@ ${report.githubUsername}` : 'GitHub Profile';
   const techStack = getTopTechStack(report);
   const summaryLines = toLines(report.overallSummary, 70, 3);
 
@@ -118,7 +120,7 @@ export function renderWidgetSvg(report: WidgetReport): string {
   <rect width="920" height="660" rx="0" fill="#F9F9FF"/>
   <rect x="22" y="22" width="876" height="616" rx="16" fill="white" stroke="#D9DEEA"/>
   <text x="58" y="68" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="1.5" fill="#005AB4">PINNED SIGNAL</text>
-  <text x="58" y="112" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="800" fill="#181C22">${escapeXml(primaryRole)} Profile</text>
+  <text x="58" y="112" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="800" fill="#181C22">${escapeXml(profileTitle)}</text>
   <rect x="714" y="58" width="126" height="34" rx="17" fill="#005AB4"/>
   <text x="777" y="80" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="800" fill="white">${report.repositories.length} pinned repos</text>
   <g font-family="Inter, Arial, sans-serif">

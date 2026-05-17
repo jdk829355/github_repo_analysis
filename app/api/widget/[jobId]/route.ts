@@ -6,6 +6,14 @@ interface RouteParams {
   params: Promise<{ jobId: string }>;
 }
 
+function getGitHubUsername(githubProfile: string): string {
+  try {
+    return new URL(githubProfile).pathname.split('/').filter(Boolean)[0] || '';
+  } catch {
+    return githubProfile.split('/').filter(Boolean).pop() || '';
+  }
+}
+
 export async function GET(request: Request, { params }: RouteParams) {
   void request;
   const { jobId } = await params;
@@ -28,6 +36,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   const report: WidgetReport = {
+    githubUsername: getGitHubUsername(job.github_profile),
     overallSummary: job.profile_report.overall_summary,
     roleEstimation: job.profile_report.role_estimation as unknown as WidgetReport['roleEstimation'],
     greenFlags: job.profile_report.green_flags || [],

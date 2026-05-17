@@ -16,7 +16,7 @@ export interface WidgetReport {
 }
 
 export type WidgetTheme = 'light' | 'dark';
-export const WIDGET_SVG_VERSION = 'inner-card-v1';
+export const WIDGET_SVG_VERSION = 'inner-card-v3';
 
 const WIDGET_THEMES: Record<WidgetTheme, {
   background: string;
@@ -45,14 +45,14 @@ const WIDGET_THEMES: Record<WidgetTheme, {
     muted: '#717785',
     brand: '#005AB4',
     brandText: '#FFFFFF',
-    greenBg: '#F0F8F3',
-    greenBorder: '#B9DCC7',
-    greenHeading: '#245235',
-    greenMarker: '#2F8F46',
-    redBg: '#FFF4F4',
-    redBorder: '#EFC7C7',
-    redHeading: '#6F2B2B',
-    redMarker: '#C84646',
+    greenBg: '#EEF6FF',
+    greenBorder: '#B8D9FF',
+    greenHeading: '#005AB4',
+    greenMarker: '#58A6FF',
+    redBg: '#EEF6FF',
+    redBorder: '#B8D9FF',
+    redHeading: '#005AB4',
+    redMarker: '#58A6FF',
   },
   dark: {
     background: '#0D1117',
@@ -63,14 +63,14 @@ const WIDGET_THEMES: Record<WidgetTheme, {
     muted: '#9AA6B6',
     brand: '#58A6FF',
     brandText: '#07111F',
-    greenBg: '#13251B',
-    greenBorder: '#2F6845',
-    greenHeading: '#A8E6BA',
-    greenMarker: '#4CC36F',
-    redBg: '#2A171A',
-    redBorder: '#7A353A',
-    redHeading: '#FFB4B8',
-    redMarker: '#F05D64',
+    greenBg: '#14263A',
+    greenBorder: '#2F6FB2',
+    greenHeading: '#58A6FF',
+    greenMarker: '#58A6FF',
+    redBg: '#14263A',
+    redBorder: '#2F6FB2',
+    redHeading: '#58A6FF',
+    redMarker: '#58A6FF',
   },
 };
 
@@ -195,12 +195,10 @@ export function renderWidgetSvg(report: WidgetReport, theme: WidgetTheme = 'ligh
   <rect x="36" y="210" width="${roleWidth}" height="36" rx="18" fill="${colors.brand}"/>
   <text x="${36 + roleWidth / 2}" y="233" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="${colors.brandText}">${escapeXml(primaryRole)}</text>
   <text x="${36 + roleWidth + 20}" y="233" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="${colors.muted}">${escapeXml(techStack.join(' · '))}</text>
-  <rect x="36" y="288" width="382" height="266" rx="16" fill="${colors.greenBg}" stroke="${colors.greenBorder}"/>
   <text x="60" y="332" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="${colors.greenHeading}">Green Flags</text>
   <g font-family="Inter, Arial, sans-serif">
     ${renderFlagItems(report.greenFlags, 64, 370, { marker: colors.greenMarker, text: colors.body })}
   </g>
-  <rect x="458" y="288" width="382" height="266" rx="16" fill="${colors.redBg}" stroke="${colors.redBorder}"/>
   <text x="482" y="332" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="${colors.redHeading}">Growth Areas</text>
   <g font-family="Inter, Arial, sans-serif">
     ${renderFlagItems(report.redFlags, 486, 370, { marker: colors.redMarker, text: colors.body })}

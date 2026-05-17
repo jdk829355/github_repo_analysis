@@ -1,0 +1,89 @@
+- generic [ref=e1]:
+  - alert [ref=e7]
+  - generic [ref=e8]:
+    - banner [ref=e9]:
+      - link "메인 화면으로" [ref=e10] [cursor=pointer]:
+        - /url: /
+        - img [ref=e11]
+        - generic [ref=e13]: 메인 화면으로
+      - generic [ref=e14]:
+        - button "HTML 위젯보내기" [active] [ref=e15]:
+          - img [ref=e16]
+          - generic [ref=e18]: HTML 위젯보내기
+        - link "PDF 다운로드" [ref=e19] [cursor=pointer]:
+          - /url: /api/report/test-job/pdf
+          - img [ref=e20]
+          - generic [ref=e22]: PDF 다운로드
+    - main [ref=e23]:
+      - heading "GitHub Profile Analysis Report" [level=1] [ref=e25]
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - heading "전체 요약" [level=2] [ref=e28]
+          - paragraph [ref=e29]: Test user summary
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - heading "Green Flags" [level=2] [ref=e32]
+            - list [ref=e33]:
+              - listitem [ref=e34]:
+                - generic [ref=e36]: Consistent commits
+              - listitem [ref=e37]:
+                - generic [ref=e39]: Documentation
+          - generic [ref=e40]:
+            - heading "Red Flags" [level=2] [ref=e41]
+            - paragraph [ref=e42]: 표시할 항목이 없습니다.
+        - generic [ref=e43]:
+          - heading "기술 스택 분석" [level=2] [ref=e44]
+          - generic [ref=e45]:
+            - generic [ref=e46]: TypeScript
+            - generic [ref=e47]: React
+        - generic [ref=e48]:
+          - heading "주요 기여 분야" [level=2] [ref=e49]
+          - list [ref=e50]:
+            - listitem [ref=e51]:
+              - generic [ref=e52]: •
+              - generic [ref=e53]: Frontend
+            - listitem [ref=e54]:
+              - generic [ref=e55]: •
+              - generic [ref=e56]: Open Source
+        - generic [ref=e57]:
+          - heading "Pin된 저장소" [level=2] [ref=e58]
+          - article [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]:
+                - generic [ref=e63]: repo-a
+                - generic [ref=e64]: TypeScript
+              - generic [ref=e66]: ★ 42
+            - paragraph [ref=e67]: Test repo
+        - generic [ref=e68]:
+          - heading "예상 역할" [level=2] [ref=e69]
+          - generic [ref=e70]:
+            - generic [ref=e71]:
+              - generic [ref=e72]: "주요:"
+              - generic [ref=e73]: Frontend Engineer
+            - generic [ref=e74]:
+              - generic [ref=e75]: "보조:"
+              - generic [ref=e76]: Full Stack
+            - generic [ref=e77]:
+              - generic [ref=e78]: "추천:"
+              - generic [ref=e79]: Tech Lead
+        - generic [ref=e80]:
+          - heading "엔지니어링 강점" [level=2] [ref=e81]
+          - list [ref=e82]:
+            - listitem [ref=e83]:
+              - generic [ref=e84]: •
+              - generic [ref=e85]: Clean code
+            - listitem [ref=e86]:
+              - generic [ref=e87]: •
+              - generic [ref=e88]: Testing
+            - listitem [ref=e89]:
+              - generic [ref=e90]: •
+              - generic [ref=e91]: Performance
+        - generic [ref=e92]:
+          - heading "협업 패턴" [level=2] [ref=e93]
+          - list [ref=e94]:
+            - listitem [ref=e95]:
+              - generic [ref=e96]: •
+              - generic [ref=e97]: Code reviews
+            - listitem [ref=e98]:
+              - generic [ref=e99]: •
+              - generic [ref=e100]: Pair programming

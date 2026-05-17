@@ -147,13 +147,24 @@ function FlagList({ title, items, tone }: { title: string; items: string[]; tone
   );
 }
 
-function WidgetExportPanel({ jobId }: { jobId: string }) {
+function WidgetExportModal({ jobId, open, onClose }: { jobId: string; open: boolean; onClose: () => void }) {
   const [origin, setOrigin] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
 
   const widgetUrl = origin ? `${origin}/widget/${jobId}` : '';
   const iframeCode = widgetUrl
@@ -179,53 +190,72 @@ function WidgetExportPanel({ jobId }: { jobId: string }) {
     window.setTimeout(() => setCopied(false), 1600);
   }
 
-  return (
-    <SectionCard title="HTML 위젯 내보내기">
-      <div className="rounded-lg border border-[#d9deea] bg-white p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold leading-6 text-[#181c22]">Detailed Card iframe</h3>
-            <p className="mt-1 text-xs leading-5 text-[#414753]">
-              외부 페이지나 블로그에 붙여 넣을 수 있는 HTML iframe 위젯입니다.
-            </p>
-          </div>
-          {widgetUrl && (
-            <a
-              href={widgetUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-md border border-[#c1c6d5] px-3 py-1.5 text-xs font-semibold text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
-            >
-              새 창에서 보기
-            </a>
-          )}
-        </div>
-        {widgetUrl && (
-          <iframe
-            src={widgetUrl}
-            title="Pinned Signal profile widget preview"
-            loading="lazy"
-            className="h-[760px] w-full max-w-[920px] rounded-2xl border-0 bg-[#f9f9ff]"
-          />
-        )}
-      </div>
+  if (!open) return null;
 
-      <div className="rounded-lg border border-[#d9deea] bg-[#181c22] p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#d9deea]">HTML</span>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[90vh] w-full max-w-[960px] flex-col gap-4 overflow-auto rounded-2xl bg-[#f1f3fc] p-6 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold leading-8 text-[#181c22]">HTML 위젯 보내기</h2>
           <button
             type="button"
-            onClick={copyIframeCode}
-            className="rounded-md border border-[#717785] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-white focus:outline-none focus:ring-2 focus:ring-white"
+            onClick={onClose}
+            className="rounded-lg p-2 text-[#717785] transition-colors hover:bg-[#e0e2eb] hover:text-[#181c22]"
+            aria-label="닫기"
           >
-            {copied ? '복사됨' : '복사'}
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
-        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#f9f9ff]">
-          {iframeCode || 'iframe 코드를 준비하는 중입니다...'}
-        </pre>
+
+        <div className="rounded-lg border border-[#d9deea] bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold leading-6 text-[#181c22]">Detailed Card iframe</h3>
+              <p className="mt-1 text-xs leading-5 text-[#414753]">
+                외부 페이지나 블로그에 붙여 넣을 수 있는 HTML iframe 위젯입니다.
+              </p>
+            </div>
+            {widgetUrl && (
+              <a
+                href={widgetUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-[#c1c6d5] px-3 py-1.5 text-xs font-semibold text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
+              >
+                새 창에서 보기
+              </a>
+            )}
+          </div>
+          {widgetUrl && (
+            <iframe
+              src={widgetUrl}
+              title="Pinned Signal profile widget preview"
+              loading="lazy"
+              className="h-[760px] w-full max-w-[920px] rounded-2xl border-0 bg-[#f9f9ff]"
+            />
+          )}
+        </div>
+
+        <div className="rounded-lg border border-[#d9deea] bg-[#181c22] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#d9deea]">HTML</span>
+            <button
+              type="button"
+              onClick={copyIframeCode}
+              className="rounded-md border border-[#717785] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-white focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              {copied ? '복사됨' : '복사'}
+            </button>
+          </div>
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#f9f9ff]">
+            {iframeCode || 'iframe 코드를 준비하는 중입니다...'}
+          </pre>
+        </div>
       </div>
-    </SectionCard>
+    </div>
   );
 }
 
@@ -250,8 +280,6 @@ function ReportContent({ report, jobId }: { report: ProfileReport; jobId: string
         <FlagList title="Green Flags" items={greenFlags} tone="green" />
         <FlagList title="Red Flags" items={redFlags} tone="red" />
       </div>
-
-      <WidgetExportPanel jobId={jobId} />
 
       {report.techStack && report.techStack.length > 0 && (
         <SectionCard title="기술 스택 분석">
@@ -360,6 +388,7 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
   const [report, setReport] = useState<ProfileReport | null>(initialReport);
   const [loading, setLoading] = useState(!initialReport);
   const [error, setError] = useState<string | null>(null);
+  const [widgetModalOpen, setWidgetModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialReport) return;
@@ -399,15 +428,27 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
           </svg>
           <span>메인 화면으로</span>
         </Link>
-        <a
-          href={`/api/report/${jobId}/pdf`}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#c1c6d5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
-        >
-          <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14" />
-          </svg>
-          <span>PDF 다운로드</span>
-        </a>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setWidgetModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#c1c6d5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
+          >
+            <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            <span>HTML 위젯보내기</span>
+          </button>
+          <a
+            href={`/api/report/${jobId}/pdf`}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#c1c6d5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
+          >
+            <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14" />
+            </svg>
+            <span>PDF 다운로드</span>
+          </a>
+        </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-6 py-8">
@@ -419,6 +460,8 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
 
         <ReportContent report={report} jobId={jobId} />
       </main>
+
+      <WidgetExportModal jobId={jobId} open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} />
     </div>
   );
 }

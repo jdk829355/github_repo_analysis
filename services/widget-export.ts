@@ -176,7 +176,7 @@ export function renderWidgetSvg(report: WidgetReport, theme: WidgetTheme = 'ligh
   const colors = WIDGET_THEMES[theme];
   const primaryRole = report.roleEstimation.primary || 'Developer';
   const roleWidth = Math.max(112, primaryRole.length * 10 + 34);
-  const profileTitle = report.githubUsername ? `@${report.githubUsername}` : 'GitHub Profile';
+  const profileTitle = report.githubUsername ? `@ ${report.githubUsername}` : 'GitHub Profile';
   const techStack = getTopTechStack(report);
   const summaryLines = toLines(report.overallSummary, 70, 3);
 

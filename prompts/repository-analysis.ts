@@ -24,6 +24,14 @@ CRITICAL: You must ONLY report what can be verified from the provided evidence.
 - When confidence is low, acknowledge uncertainty
 - Every claim must be traceable to specific fact in the input`;
 
+const CRITICAL_REVIEW = `## CRITICAL REVIEW INSTRUCTIONS
+Do not write a one-sided praise summary. Evaluate the repository evidence like a senior engineer reviewing a portfolio.
+- In the summary, include both what the user appears strong at and what is weak, missing, or uncertain
+- Treat absent evidence as a signal: if tests, documentation, CI/CD, observability, security, review activity, or maintainability are not visible, mention that the evidence is insufficient rather than assuming quality
+- Distinguish "not observed" from "bad"; write factual Korean phrases such as "테스트 근거는 제한적입니다" or "협업/리뷰 신호는 충분히 드러나지 않습니다"
+- If commits look narrow, repetitive, initial-only, or mostly configuration changes, reflect that in confidence and summary
+- leadershipSignals must contain only actual evidence; leave it empty when leadership is not demonstrated`;
+
 const OUTPUT_FORMAT = `## OUTPUT FORMAT
 Respond ONLY with valid JSON matching this exact schema.
 IMPORTANT: All text values must be written in Korean (한글).
@@ -89,6 +97,8 @@ export const repositoryAnalysis = {
     return `${SYSTEM_PROMPT}
 
 ${ANTI_HALLUCINATION}
+
+${CRITICAL_REVIEW}
 
 ${OUTPUT_FORMAT}
 

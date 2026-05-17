@@ -22,6 +22,8 @@ interface ProfileReport {
   roleEstimation: RoleEstimation;
   engineeringStrengths: string[];
   collaborationPatterns: string[];
+  greenFlags: string[];
+  redFlags: string[];
 }
 
 interface ReportClientProps {
@@ -120,10 +122,119 @@ function RoleSection({ roleEstimation }: { roleEstimation: RoleEstimation }) {
   );
 }
 
-function ReportContent({ report }: { report: ProfileReport }) {
+function FlagList({ title, items, tone }: { title: string; items: string[]; tone: 'green' | 'red' }) {
+  const toneClasses = tone === 'green'
+    ? 'border-[#b9dcc7] bg-[#f0f8f3] text-[#245235]'
+    : 'border-[#efc7c7] bg-[#fff4f4] text-[#6f2b2b]';
+  const markerClass = tone === 'green' ? 'bg-[#2f8f46]' : 'bg-[#c84646]';
+
+  return (
+    <section className={`flex flex-col gap-4 rounded-xl border p-6 ${toneClasses}`}>
+      <h2 className="text-xl font-semibold leading-7">{title}</h2>
+      {items.length > 0 ? (
+        <ul className="space-y-2">
+          {items.map((item, index) => (
+            <li key={index} className="flex items-start gap-2 text-sm leading-5">
+              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${markerClass}`} />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm leading-5 opacity-75">표시할 항목이 없습니다.</p>
+      )}
+    </section>
+  );
+}
+
+function WidgetExportPanel({ jobId }: { jobId: string }) {
+  const [origin, setOrigin] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const widgetUrl = origin ? `${origin}/widget/${jobId}` : '';
+  const iframeCode = widgetUrl
+    ? `<iframe src="${widgetUrl}" width="920" height="760" style="width:100%;max-width:920px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" title="Pinned Signal profile widget"></iframe>`
+    : '';
+
+  async function copyIframeCode() {
+    if (!iframeCode) return;
+    try {
+      await navigator.clipboard.writeText(iframeCode);
+    } catch (error) {
+      const textarea = document.createElement('textarea');
+      textarea.value = iframeCode;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <SectionCard title="HTML 위젯 내보내기">
+      <div className="rounded-lg border border-[#d9deea] bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold leading-6 text-[#181c22]">Detailed Card iframe</h3>
+            <p className="mt-1 text-xs leading-5 text-[#414753]">
+              외부 페이지나 블로그에 붙여 넣을 수 있는 HTML iframe 위젯입니다.
+            </p>
+          </div>
+          {widgetUrl && (
+            <a
+              href={widgetUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-[#c1c6d5] px-3 py-1.5 text-xs font-semibold text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
+            >
+              새 창에서 보기
+            </a>
+          )}
+        </div>
+        {widgetUrl && (
+          <iframe
+            src={widgetUrl}
+            title="Pinned Signal profile widget preview"
+            loading="lazy"
+            className="h-[760px] w-full max-w-[920px] rounded-2xl border-0 bg-[#f9f9ff]"
+          />
+        )}
+      </div>
+
+      <div className="rounded-lg border border-[#d9deea] bg-[#181c22] p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#d9deea]">HTML</span>
+          <button
+            type="button"
+            onClick={copyIframeCode}
+            className="rounded-md border border-[#717785] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-white focus:outline-none focus:ring-2 focus:ring-white"
+          >
+            {copied ? '복사됨' : '복사'}
+          </button>
+        </div>
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#f9f9ff]">
+          {iframeCode || 'iframe 코드를 준비하는 중입니다...'}
+        </pre>
+      </div>
+    </SectionCard>
+  );
+}
+
+function ReportContent({ report, jobId }: { report: ProfileReport; jobId: string }) {
   const repos = report.repositories || [];
   const [showAllStrengths, setShowAllStrengths] = useState(false);
   const engineeringStrengths = report.engineeringStrengths || [];
+  const greenFlags = report.greenFlags || [];
+  const redFlags = report.redFlags || [];
   const visibleEngineeringStrengths = showAllStrengths
     ? engineeringStrengths
     : engineeringStrengths.slice(0, 3);
@@ -134,6 +245,13 @@ function ReportContent({ report }: { report: ProfileReport }) {
       <SectionCard title="전체 요약">
         <p className="text-sm leading-relaxed text-[#414753]">{report.overallSummary}</p>
       </SectionCard>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <FlagList title="Green Flags" items={greenFlags} tone="green" />
+        <FlagList title="Red Flags" items={redFlags} tone="red" />
+      </div>
+
+      <WidgetExportPanel jobId={jobId} />
 
       {report.techStack && report.techStack.length > 0 && (
         <SectionCard title="기술 스택 분석">
@@ -299,7 +417,7 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
           </h1>
         </div>
 
-        <ReportContent report={report} />
+        <ReportContent report={report} jobId={jobId} />
       </main>
     </div>
   );

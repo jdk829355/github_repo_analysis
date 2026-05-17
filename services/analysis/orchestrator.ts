@@ -42,6 +42,8 @@ type CachedProfileReport = {
   role_estimation: unknown;
   engineering_strengths: string[];
   collaboration_patterns: string[];
+  green_flags: string[];
+  red_flags: string[];
 };
 
 function repoCacheKey(repo: { full_name?: string; name: string }): string {
@@ -158,7 +160,11 @@ export async function runAnalysisPipeline(
       const previousRepositories = previousJob.repositories as CachedRepository[];
       const previousFingerprint = buildProfileFingerprint(previousRepositories);
       previousProfileReport = previousJob.profile_report as CachedProfileReport | null;
+      const hasProfileFlagSections = Boolean(
+        (previousProfileReport?.green_flags?.length || 0) + (previousProfileReport?.red_flags?.length || 0)
+      );
       canReuseProfileReport = Boolean(previousProfileReport)
+        && hasProfileFlagSections
         && previousFingerprint === currentFingerprint;
 
       for (const repo of previousRepositories) {
@@ -258,6 +264,8 @@ export async function runAnalysisPipeline(
             role_estimation: previousProfileReport.role_estimation as Prisma.InputJsonValue,
             engineering_strengths: previousProfileReport.engineering_strengths,
             collaboration_patterns: previousProfileReport.collaboration_patterns,
+            green_flags: previousProfileReport.green_flags || [],
+            red_flags: previousProfileReport.red_flags || [],
           },
         });
         await publishEvent(jobId, { type: 'aggregation_complete', reused: true });

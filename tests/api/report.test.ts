@@ -66,6 +66,8 @@ describe('GET /api/report/[jobId]', () => {
         role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
         engineering_strengths: ['API design'],
         collaboration_patterns: ['Code reviews'],
+        green_flags: ['API design evidence'],
+        red_flags: ['Limited testing evidence'],
       },
       repositories: [
         { name: 'repo-1', description: 'Test repo', primary_language: 'TypeScript', stars: 10 },
@@ -83,6 +85,8 @@ describe('GET /api/report/[jobId]', () => {
       roleEstimation: { primary: 'Backend', secondary: [], recommended: [] },
       engineeringStrengths: ['API design'],
       collaborationPatterns: ['Code reviews'],
+      greenFlags: ['API design evidence'],
+      redFlags: ['Limited testing evidence'],
       repositories: [
         { name: 'repo-1', description: 'Test repo', language: 'TypeScript', stars: 10 },
       ],
@@ -125,6 +129,8 @@ describe('GET /api/report/[jobId]', () => {
         role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
         engineering_strengths: ['API design'],
         collaboration_patterns: ['Code reviews'],
+        green_flags: ['API design evidence'],
+        red_flags: ['Limited testing evidence'],
       },
       repositories: [
         { name: 'repo-1', description: 'Test repo', primary_language: 'TypeScript', stars: 10 },
@@ -144,6 +150,8 @@ describe('GET /api/report/[jobId]', () => {
       'job-123',
       expect.objectContaining({
         overallSummary: 'Test summary',
+        greenFlags: ['API design evidence'],
+        redFlags: ['Limited testing evidence'],
         repositories: [
           { name: 'repo-1', description: 'Test repo', language: 'TypeScript', stars: 10 },
         ],
@@ -169,6 +177,8 @@ describe('GET /api/report/[jobId]', () => {
         role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
         engineering_strengths: ['API design'],
         collaboration_patterns: ['Code reviews'],
+        green_flags: ['API design evidence'],
+        red_flags: ['Limited testing evidence'],
       },
       repositories: [],
       pdf_exports: [],
@@ -186,6 +196,8 @@ describe('GET /api/report/[jobId]', () => {
       'job-123',
       expect.objectContaining({
         overallSummary: 'Test',
+        greenFlags: ['API design evidence'],
+        redFlags: ['Limited testing evidence'],
         repositories: [],
       })
     );

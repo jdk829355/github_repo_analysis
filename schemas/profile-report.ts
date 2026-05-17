@@ -10,6 +10,8 @@ export const ProfileReportSchema = z.object({
   }),
   engineeringStrengths: z.array(z.string()),
   collaborationPatterns: z.array(z.string()),
+  greenFlags: z.array(z.string()),
+  redFlags: z.array(z.string()),
 });
 
 export type ProfileReport = z.infer<typeof ProfileReportSchema>;

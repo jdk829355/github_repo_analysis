@@ -71,6 +71,8 @@ describe('services/analysis/profile-aggregation', () => {
       },
       engineeringStrengths: ['API design'],
       collaborationPatterns: ['Code reviews'],
+      greenFlags: ['API design evidence'],
+      redFlags: ['Limited testing evidence'],
     };
   }
 
@@ -104,6 +106,8 @@ describe('services/analysis/profile-aggregation', () => {
         role_estimation: report.roleEstimation,
         engineering_strengths: report.engineeringStrengths,
         collaboration_patterns: report.collaborationPatterns,
+        green_flags: report.greenFlags,
+        red_flags: report.redFlags,
       },
     });
     expect(mockPublishEvent).toHaveBeenCalledWith('job-1', { type: 'aggregation_complete' });
@@ -181,6 +185,8 @@ describe('services/analysis/profile-aggregation', () => {
         },
         engineering_strengths: ['Repo summary'],
         collaboration_patterns: [],
+        green_flags: ['Repo summary'],
+        red_flags: ['프로필 집계에 실패하여 비판적 신호를 충분히 도출하지 못했습니다.'],
       },
     });
     expect(mockPublishEvent).toHaveBeenCalledWith('job-1', {

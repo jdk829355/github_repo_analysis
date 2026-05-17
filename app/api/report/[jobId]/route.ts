@@ -30,6 +30,8 @@ export async function GET(
     roleEstimation: report.role_estimation,
     engineeringStrengths: report.engineering_strengths,
     collaborationPatterns: report.collaboration_patterns,
+    greenFlags: report.green_flags || [],
+    redFlags: report.red_flags || [],
     repositories: (job.repositories || []).map((r: any) => ({
       name: r.name,
       description: r.description || '',

@@ -138,6 +138,8 @@ describe('prompts/types', () => {
           'Active code reviewer',
           'Mentorship for junior developers',
         ],
+        greenFlags: ['Strong backend evidence'],
+        redFlags: ['Limited testing evidence'],
         recommendedRoles: ['Backend Engineer', 'Technical Lead'],
       };
       const result = ProfileAggregationSchema.safeParse(output);
@@ -153,6 +155,8 @@ describe('prompts/types', () => {
         },
         engineeringStrengths: [],
         collaborationPatterns: [],
+        greenFlags: [],
+        redFlags: ['Evidence is sparse'],
         recommendedRoles: [],
       };
       const result = ProfileAggregationSchema.safeParse(output);
@@ -308,6 +312,8 @@ describe('prompts/profile-aggregation', () => {
     expect(rendered).toContain('roleEstimation');
     expect(rendered).toContain('engineeringStrengths');
     expect(rendered).toContain('collaborationPatterns');
+    expect(rendered).toContain('greenFlags');
+    expect(rendered).toContain('redFlags');
     expect(rendered).toContain('recommended');
   });
 
@@ -341,6 +347,8 @@ describe('prompts/profile-aggregation', () => {
     const rendered = profileAggregation.render(input);
     expect(rendered.toLowerCase()).toContain('synthes');
     expect(rendered.toLowerCase()).toContain('aggregat');
+    expect(rendered).toContain('greenFlags');
+    expect(rendered).toContain('redFlags');
   });
 
   it('render includes output JSON format specification', () => {
@@ -404,6 +412,7 @@ describe('prompts/profile-aggregation', () => {
     expect(rendered).toContain('Korean');
     expect(rendered).toContain('overallSummary');
     expect(rendered).toContain('collaborationPatterns');
+    expect(rendered).toContain('redFlags');
   });
 });
 
@@ -415,5 +424,6 @@ describe('prompts/repository-analysis Korean instruction', () => {
     const rendered = repositoryAnalysis.render(input);
     expect(rendered).toContain('Korean');
     expect(rendered).toContain('summary');
+    expect(rendered).toContain('CRITICAL REVIEW');
   });
 });

@@ -74,6 +74,8 @@ model profile_reports {
   role_estimation       Json
   engineering_strengths String[]
   collaboration_patterns String[]
+  green_flags           String[] @default([])
+  red_flags             String[] @default([])
   created_at            DateTime @default(now())
 
   analysis_job          analysis_jobs @relation(fields: [analysis_job_id], references: [id])

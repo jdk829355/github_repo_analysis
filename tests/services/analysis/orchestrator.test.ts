@@ -368,6 +368,8 @@ describe('services/analysis/orchestrator', () => {
           role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
           engineering_strengths: ['API design'],
           collaboration_patterns: ['Code reviews'],
+          green_flags: ['API design evidence'],
+          red_flags: ['Limited testing evidence'],
         },
         repositories: [
           {
@@ -433,12 +435,79 @@ describe('services/analysis/orchestrator', () => {
           role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
           engineering_strengths: ['API design'],
           collaboration_patterns: ['Code reviews'],
+          green_flags: ['API design evidence'],
+          red_flags: ['Limited testing evidence'],
         },
       });
       expect(mockPublishEvent).toHaveBeenCalledWith(
         jobId,
         { type: 'aggregation_complete', reused: true }
       );
+    });
+
+    it('regenerates profile report when previous report has no flag sections', async () => {
+      mockCheckJobDeduplication.mockResolvedValue(null);
+      mockAnalysisJobsCreate.mockResolvedValue({ id: jobId });
+      mockAnalysisJobsUpdate.mockResolvedValue({ id: jobId });
+      mockGetUserPinnedRepositories.mockResolvedValue({
+        repositories: [
+          {
+            id: 1,
+            name: 'repo-a',
+            full_name: 'testuser/repo-a',
+            updated_at: '2024-01-01T00:00:00Z',
+            owner: 'testuser',
+          },
+        ],
+        filteredCount: 0,
+      });
+      mockAnalysisJobsFindFirst.mockResolvedValue({
+        id: 'previous-job',
+        profile_report: {
+          overall_summary: 'cached profile report',
+          role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
+          engineering_strengths: ['API design'],
+          collaboration_patterns: ['Code reviews'],
+          green_flags: [],
+          red_flags: [],
+        },
+        repositories: [
+          {
+            id: 'old-repo-a',
+            name: 'repo-a',
+            full_name: 'testuser/repo-a',
+            description: null,
+            primary_language: null,
+            stars: 0,
+            forks: 0,
+            is_fork: false,
+            is_archived: false,
+            updated_at: new Date('2024-01-01T00:00:00Z'),
+            repository_analyses: [
+              {
+                repository_name: 'repo-a',
+                summary: 'repo-a summary',
+                project_type: 'web-app',
+                estimated_roles: ['Backend'],
+                main_contributions: ['API'],
+                tech_stack: ['TypeScript'],
+                leadership_signals: [],
+                confidence: 0.9,
+              },
+            ],
+          },
+        ],
+      });
+
+      const { startAnalysis } = setupMocks();
+      await startAnalysis(username, githubUrl);
+
+      expect(mockAnalyzeRepositoryPipeline).not.toHaveBeenCalled();
+      expect(mockAggregateProfile).toHaveBeenCalledWith(
+        { username, jobId },
+        expect.any(Object)
+      );
+      expect(mockProfileReportsCreate).not.toHaveBeenCalled();
     });
   });
 

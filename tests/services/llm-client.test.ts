@@ -132,6 +132,8 @@ describe('services/llm-client', () => {
       },
       engineeringStrengths: ['API design'],
       collaborationPatterns: ['Code reviews'],
+      greenFlags: ['API design evidence'],
+      redFlags: ['Limited testing evidence'],
     };
 
     mockGenerateContent.mockResolvedValueOnce(createResponse(JSON.stringify(validOutput)));

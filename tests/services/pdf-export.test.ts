@@ -51,6 +51,8 @@ describe('services/pdf-export', () => {
       },
       engineeringStrengths: ['API 설계'],
       collaborationPatterns: ['문서화'],
+      greenFlags: ['API 설계 근거가 있습니다'],
+      redFlags: ['테스트 근거는 제한적입니다'],
       repositories: [
         {
           name: 'repo-a',
@@ -75,6 +77,8 @@ describe('services/pdf-export', () => {
       const renderedHtml = mockSetContent.mock.calls[0][0];
       expect(renderedHtml).toContain('<section class="section">');
       expect(renderedHtml).toContain('<p class="summary-text">한글 요약</p>');
+      expect(renderedHtml).toContain('Green Flags');
+      expect(renderedHtml).toContain('테스트 근거는 제한적입니다');
       expect(renderedHtml).toContain('<ul class="repo-list">');
       expect(renderedHtml).toContain('<strong>repo-a</strong>');
       expect(renderedHtml).toContain('<ul class="definition-list">');

@@ -37,6 +37,8 @@ export const ProfileAggregationSchema = z.object({
   }),
   engineeringStrengths: z.array(z.string()).describe('Key technical strengths identified'),
   collaborationPatterns: z.array(z.string()).describe('How the developer collaborates with others'),
+  greenFlags: z.array(z.string()).describe('Evidence-backed positive hiring or collaboration signals'),
+  redFlags: z.array(z.string()).describe('Evidence-backed risks, gaps, or cautionary signals'),
   recommendedRoles: z.array(z.string()).describe('Suggested roles based on profile analysis'),
 });
 

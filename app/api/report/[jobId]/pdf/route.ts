@@ -31,6 +31,8 @@ export async function GET(
     roleEstimation: job.profile_report.role_estimation as PdfReport['roleEstimation'],
     engineeringStrengths: job.profile_report.engineering_strengths,
     collaborationPatterns: job.profile_report.collaboration_patterns,
+    greenFlags: job.profile_report.green_flags || [],
+    redFlags: job.profile_report.red_flags || [],
     repositories: (job.repositories || []).map((repository) => ({
       name: repository.name,
       description: repository.description || '',

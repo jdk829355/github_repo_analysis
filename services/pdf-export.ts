@@ -23,6 +23,8 @@ export interface PdfReport {
   };
   engineeringStrengths: string[];
   collaborationPatterns: string[];
+  greenFlags: string[];
+  redFlags: string[];
   repositories: PdfRepository[];
 }
 
@@ -221,6 +223,16 @@ function renderReportHtml(report: PdfReport): string {
     <section class="section">
       <h2 class="section-title">전체 요약</h2>
       <p class="summary-text">${escapeHtml(report.overallSummary)}</p>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Green Flags</h2>
+      ${renderList(report.greenFlags)}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Red Flags</h2>
+      ${renderList(report.redFlags)}
     </section>
 
     <section class="section">

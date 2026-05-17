@@ -121,6 +121,8 @@ export async function aggregateProfile(
         role_estimation: validated.roleEstimation,
         engineering_strengths: validated.engineeringStrengths,
         collaboration_patterns: validated.collaborationPatterns,
+        green_flags: validated.greenFlags,
+        red_flags: validated.redFlags,
       },
     });
 
@@ -150,6 +152,8 @@ export async function aggregateProfile(
       },
       engineering_strengths: completedAnalyses.map((analysis) => analysis.summary),
       collaboration_patterns: [],
+      green_flags: completedAnalyses.map((analysis) => analysis.summary),
+      red_flags: ['프로필 집계에 실패하여 비판적 신호를 충분히 도출하지 못했습니다.'],
     };
 
     if (existingReport) {

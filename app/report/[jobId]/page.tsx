@@ -20,6 +20,8 @@ interface ProfileReport {
   roleEstimation: RoleEstimation;
   engineeringStrengths: string[];
   collaborationPatterns: string[];
+  greenFlags: string[];
+  redFlags: string[];
 }
 
 interface PrismaProfileReport {
@@ -35,6 +37,8 @@ interface PrismaProfileReport {
   role_estimation: RoleEstimation;
   engineering_strengths: string[];
   collaboration_patterns: string[];
+  green_flags?: string[];
+  red_flags?: string[];
 }
 
 function normalizeReport(data: PrismaProfileReport): ProfileReport {
@@ -51,6 +55,8 @@ function normalizeReport(data: PrismaProfileReport): ProfileReport {
     roleEstimation: data.role_estimation,
     engineeringStrengths: data.engineering_strengths,
     collaborationPatterns: data.collaboration_patterns,
+    greenFlags: data.green_flags || [],
+    redFlags: data.red_flags || [],
   };
 }
 

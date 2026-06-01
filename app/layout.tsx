@@ -12,6 +12,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TXM6ZGMCDF"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-TXM6ZGMCDF');
+    </script>
     <html lang="ko" className="antialiased">
       <body className="min-h-full flex flex-col bg-[#f9f9ff]">{children}</body>
     </html>

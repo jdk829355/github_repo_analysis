@@ -326,11 +326,18 @@ export async function runAnalysisPipeline(
       },
     });
     await cache.clearJobActive(githubUrl);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await publishEvent(jobId, {
       type: 'stateChange',
       state: 'FAILED',
       jobId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
+    });
+    await publishEvent(jobId, {
+      type: 'job_failed',
+      state: 'FAILED',
+      jobId,
+      error: errorMessage,
     });
     throw error;
   }

@@ -61,7 +61,7 @@ function AnalysisProgressClient({
   }, [params]);
 
   useEffect(() => {
-    if (!jobId) return;
+    if (!jobId || status === "FAILED") return;
 
     const connect = () => {
       if (hasNavigated.current) return;
@@ -80,6 +80,10 @@ function AnalysisProgressClient({
                 setStatus(data.state);
                 if (data.state === "COMPLETED") {
                   navigateToReport(jobId);
+                }
+                if (data.state === "FAILED") {
+                  setError(data.error || "분석에 실패했습니다");
+                  eventSource.close();
                 }
               }
               break;
@@ -137,7 +141,7 @@ function AnalysisProgressClient({
 
       eventSource.onerror = () => {
         eventSource.close();
-        if (!hasNavigated.current && status !== "COMPLETED" && status !== "FAILED") {
+        if (!hasNavigated.current && status !== "COMPLETED") {
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, 2000);

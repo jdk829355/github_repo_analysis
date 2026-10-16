@@ -621,6 +621,12 @@ describe('services/analysis/orchestrator', () => {
           error: 'LLM failed',
         })
       );
+      expect(mockPublishEvent).toHaveBeenCalledWith(jobId, {
+        type: 'job_failed',
+        state: 'FAILED',
+        jobId,
+        error: 'LLM failed',
+      });
     });
 
     it('marks FAILED and clears active on aggregation error', async () => {

@@ -12,7 +12,7 @@
 
 GitHub Profile Analyzer(서비스 이름 Pinned Signal)는 사용자가 입력한 GitHub Profile URL에서 pin된 repository와 commit history를 분석해 어떤 프로젝트를 수행했고 어떤 역할을 맡았는지 자동으로 추론하는 서비스이다.
 
-서비스는 GitHub API로 데이터를 수집하고 Gemini API 기반 LLM으로 repository 수준과 profile 수준의 엔지니어링 보고서를 만든다.
+서비스는 GitHub API로 데이터를 수집하고 OpenAI 호환 API 기반 LLM으로 repository 수준과 profile 수준의 엔지니어링 보고서를 만든다.
 
 결과는 웹 UI, PDF, README에 넣을 수 있는 SVG 위젯으로 제공한다.
 
@@ -234,7 +234,7 @@ Profile 수준 결과는 주 역할(primary), 보조 역할(secondary), 추천 �
 * README missing (README 없이 분석을 계속한다)
 * empty repository
 * pin된 repository 없음
-* Gemini API failure
+* LLM API failure
 * malformed LLM output
 * timeout
 

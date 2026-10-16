@@ -169,7 +169,7 @@ pin된 repository 중 다음은 제외한다.
 
 분석을 요청한 계정이 이 프로젝트의 repository(`jdk829355/github_repo_analysis`)에 star를 눌렀는지 확인한다.
 
-* 별도 인증 절차는 아니다. 입력한 username이 해당 repository의 stargazer 목록에 있는지만 본다.
+* 별도 인증 절차는 아니다. 입력한 username의 star 목록(`GET /users/{username}/starred`)에 해당 repository가 있는지만 본다.
 * 검증을 통과하지 못하면 분석 job을 만들지 않고 403으로 응답한다.
 * 검증만 따로 수행하는 `POST /api/verify-star`와 job 생성 시점의 검증은 같은 기준을 쓴다.
 

@@ -22,12 +22,16 @@ export async function GET(
   });
 
   let heartbeatInterval: NodeJS.Timeout | null = null;
+  let closed = false;
+  let cleanup = () => {};
 
   const stream = new ReadableStream({
     async start(controller) {
       const channel = getEventChannel(jobId);
 
-      const cleanup = () => {
+      cleanup = () => {
+        if (closed) return;
+        closed = true;
         if (heartbeatInterval) {
           clearInterval(heartbeatInterval);
           heartbeatInterval = null;
@@ -38,41 +42,70 @@ export async function GET(
         subscriber.quit().catch(() => {});
       };
 
+      const send = (text: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(text));
+        } catch {
+          cleanup();
+        }
+      };
+
+      const closeStream = () => {
+        cleanup();
+        try {
+          controller.close();
+        } catch {
+        }
+      };
+
       const handleMessage = (receivedChannel: string, message: string) => {
         if (receivedChannel !== channel) return;
 
-        controller.enqueue(encoder.encode(`data: ${message}\n\n`));
+        send(`data: ${message}\n\n`);
 
         try {
           const parsed = JSON.parse(message);
           if (TERMINAL_EVENTS.includes(parsed.type)) {
-            cleanup();
-            controller.close();
+            closeStream();
           }
         } catch {
         }
       };
 
       const handleAbort = () => {
-        cleanup();
-        controller.close();
+        closeStream();
       };
 
+      subscriber.on('message', handleMessage);
+      request.signal.addEventListener('abort', handleAbort);
+
+      // pub/sub은 구독 전에 발행된 메시지를 보관하지 않는다. 먼저 구독한 뒤에
+      // 상태를 읽어야 그 사이에 끝난 작업의 종료 이벤트를 놓치지 않는다.
       try {
-        const initialState = await getJobState(jobId);
-        const initialEvent = JSON.stringify({
+        await subscriber.subscribe(channel);
+      } catch (err) {
+        cleanup();
+        controller.error(err as Error);
+        return;
+      }
+
+      heartbeatInterval = setInterval(() => {
+        send(': heartbeat\n\n');
+      }, 30000);
+
+      let initialState: string | null = null;
+      try {
+        initialState = await getJobState(jobId);
+      } catch {
+      }
+      send(
+        `data: ${JSON.stringify({
           type: 'state',
           state: initialState ?? 'PENDING',
           jobId,
-        });
-        controller.enqueue(encoder.encode(`data: ${initialEvent}\n\n`));
-      } catch {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ type: 'state', state: 'PENDING', jobId })}\n\n`
-          )
-        );
-      }
+        })}\n\n`
+      );
 
       try {
         const repoList = await getJobRepoList(jobId);
@@ -83,7 +116,7 @@ export async function GET(
             repos: repoList,
             jobId,
           });
-          controller.enqueue(encoder.encode(`data: ${repoListEvent}\n\n`));
+          send(`data: ${repoListEvent}\n\n`);
         }
       } catch {
       }
@@ -102,27 +135,17 @@ export async function GET(
             summary: analysis?.summary || '',
             jobId,
           });
-          controller.enqueue(encoder.encode(`data: ${repoEvent}\n\n`));
+          send(`data: ${repoEvent}\n\n`);
         }
       } catch {
       }
 
-      heartbeatInterval = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(': heartbeat\n\n'));
-        } catch {
-        }
-      }, 30000);
-
-      subscriber.on('message', handleMessage);
-      request.signal.addEventListener('abort', handleAbort);
-
-      try {
-        await subscriber.subscribe(channel);
-      } catch (err) {
-        cleanup();
-        controller.error(err as Error);
+      if (initialState === 'COMPLETED' || initialState === 'FAILED') {
+        closeStream();
       }
+    },
+    cancel() {
+      cleanup();
     },
   });
 

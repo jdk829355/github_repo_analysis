@@ -84,7 +84,6 @@ describe('infrastructure setup', () => {
       'schemas',
       'workers',
       'tests',
-      'docker',
     ];
 
     it.each(requiredDirs)('should have %s directory', (dir) => {

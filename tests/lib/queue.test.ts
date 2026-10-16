@@ -65,13 +65,7 @@ describe('lib/queue', () => {
       'analysis',
       expect.objectContaining({
         connection: expect.any(Object),
-        defaultJobOptions: expect.objectContaining({
-          attempts: 2,
-          backoff: expect.objectContaining({
-            type: 'exponential',
-            delay: 5000,
-          }),
-        }),
+        defaultJobOptions: { attempts: 1 },
       })
     );
   });

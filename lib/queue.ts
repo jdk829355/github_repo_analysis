@@ -19,11 +19,7 @@ const prisma = new PrismaClient();
 export const analysisQueue = new Queue<AnalysisJobData>('analysis', {
   connection: redisConnection,
   defaultJobOptions: {
-    attempts: 2,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
-    },
+    attempts: 1,
   },
 });
 

@@ -104,20 +104,6 @@ export async function runAnalysisPipeline(
 
     if (repositories.length === 0) {
       // repo가 없는 경우
-      await prisma.analysis_jobs.update({
-        where: { id: jobId },
-        data: {
-          status: 'FAILED',
-          error_message: 'No pinned repositories found',
-        },
-      });
-      await cache.clearJobActive(githubUrl); // 캐시 무효화
-      await publishEvent(jobId, {
-        type: 'stateChange',
-        state: 'FAILED',
-        jobId,
-        error: 'No pinned repositories found',
-      }); // 실패를 sse로 브라우저에 알림
       throw new AnalysisError('No pinned repositories found', 'fetch');
     }
 

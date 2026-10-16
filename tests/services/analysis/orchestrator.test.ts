@@ -515,7 +515,7 @@ describe('services/analysis/orchestrator', () => {
   });
 
   describe('zero pinned repos', () => {
-    it('marks FAILED and throws when no pinned repositories exist', async () => {
+    it('marks FAILED exactly once and throws when no pinned repositories exist', async () => {
       mockCheckJobDeduplication.mockResolvedValue(null);
       mockAnalysisJobsCreate.mockResolvedValue({ id: jobId });
       mockAnalysisJobsUpdate.mockResolvedValue({ id: jobId });
@@ -525,30 +525,40 @@ describe('services/analysis/orchestrator', () => {
       });
 
       const { startAnalysis } = setupMocks();
-      await expect(startAnalysis(username, githubUrl)).rejects.toThrow(
-        AnalysisError
-      );
-      await expect(startAnalysis(username, githubUrl)).rejects.toThrow(
-        'No pinned repositories found'
-      );
+      const error = await startAnalysis(username, githubUrl).catch((e: Error) => e);
+      expect(error).toBeInstanceOf(AnalysisError);
+      expect(error.message).toBe('No pinned repositories found');
 
-      expect(mockAnalysisJobsUpdate).toHaveBeenCalledWith({
-        where: { id: jobId },
-        data: {
-          status: 'FAILED',
-          error_message: 'No pinned repositories found',
-        },
-      });
-      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
-      expect(mockPublishEvent).toHaveBeenCalledWith(
-        jobId,
-        expect.objectContaining({
-          type: 'stateChange',
-          state: 'FAILED',
-          jobId,
-          error: 'No pinned repositories found',
-        })
+      const failedUpdates = mockAnalysisJobsUpdate.mock.calls.filter(
+        ([arg]) => arg.data.status === 'FAILED'
       );
+      expect(failedUpdates).toEqual([
+        [
+          {
+            where: { id: jobId },
+            data: {
+              status: 'FAILED',
+              error_message: 'No pinned repositories found',
+            },
+          },
+        ],
+      ]);
+      expect(mockClearJobActive).toHaveBeenCalledTimes(1);
+      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+      const failedEvents = mockPublishEvent.mock.calls.filter(
+        ([, event]) => event.type === 'stateChange' && event.state === 'FAILED'
+      );
+      expect(failedEvents).toEqual([
+        [
+          jobId,
+          {
+            type: 'stateChange',
+            state: 'FAILED',
+            jobId,
+            error: 'No pinned repositories found',
+          },
+        ],
+      ]);
       expect(mockAnalyzeRepositoryPipeline).not.toHaveBeenCalled();
       expect(mockAggregateProfile).not.toHaveBeenCalled();
     });

@@ -91,17 +91,19 @@ export async function runAnalysisPipeline(
     await prisma.analysis_jobs.update({
       where: { id: jobId },
       data: { status: 'PROCESSING' },
-    });
+    }); // DB에 작업 상태 업데이트
+
     await publishEvent(jobId, {
       type: 'stateChange',
       state: 'PROCESSING',
       jobId,
-    });
+    }); // pubsub에 작업 상태 업데이트. sse를 통해 브라우저로 이벤트 전달
 
     const { repositories } = await githubClient.getUserPinnedRepositories(username);
     const currentFingerprint = buildProfileFingerprint(repositories);
 
     if (repositories.length === 0) {
+      // repo가 없는 경우
       await prisma.analysis_jobs.update({
         where: { id: jobId },
         data: {
@@ -109,13 +111,13 @@ export async function runAnalysisPipeline(
           error_message: 'No pinned repositories found',
         },
       });
-      await cache.clearJobActive(githubUrl);
+      await cache.clearJobActive(githubUrl); // 캐시 무효화
       await publishEvent(jobId, {
         type: 'stateChange',
         state: 'FAILED',
         jobId,
         error: 'No pinned repositories found',
-      });
+      }); // 실패를 sse로 브라우저에 알림
       throw new AnalysisError('No pinned repositories found', 'fetch');
     }
 

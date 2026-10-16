@@ -4,22 +4,20 @@ export interface Commit {
 }
 
 const REGEX_PATTERNS = [
-  /^merge/i,
-  /^merged/i,
-  /^typo/i,
-  /^fix\s+lint/i,
-  /^lint/i,
-  /^format/i,
-  /^prettier/i,
-  /^eslint/i,
-  /^style/i,
-  /^docs/i,
-  /^doc/i,
-  /^readme/i,
-  /^bump/i,
-  /^chore/i,
-  /^update\s+dependency/i,
-  /^dependabot/i,
+  /^merged?\b/i,
+  /^typo\b/i,
+  /^fix\s+lint\b/i,
+  /^lint\b/i,
+  /^format(ting)?\b/i,
+  /^prettier\b/i,
+  /^eslint\b/i,
+  /^style\b/i,
+  /^docs?\b/i,
+  /^readme\b/i,
+  /^bump\b/i,
+  /^chore\b/i,
+  /^update\s+dependency\b/i,
+  /^dependabot\b/i,
   /^[0-9]{4}[-/][0-9]{2}[-/][0-9]{2}/,
   /^[0-9]{6,8}$/,
   /^wip$/i,
@@ -45,12 +43,12 @@ function isDependencyUpdate(message: string): boolean {
   return /^update\s+(.+)?dependenc(y|ies)/i.test(lowerMessage) ||
          /^bump\s+.+(?:\s+to\s+|\s+-\s+)/i.test(lowerMessage) ||
          /^[a-z]+-\d+\.\d+\.\d+/i.test(lowerMessage) ||
-         (lowerMessage.startsWith('update') && /lodash|react|npm|package|version/i.test(message));
+         (lowerMessage.startsWith('update') && /\b(lodash|react|npm|package|version)\b/i.test(message));
 }
 
 function isArchiveOrMemo(message: string): boolean {
   const lowerMessage = message.toLowerCase();
-  return /^archive/i.test(lowerMessage) || /^memo/i.test(lowerMessage);
+  return /^archive\b/i.test(lowerMessage) || /^memo\b/i.test(lowerMessage);
 }
 
 function isFormattingOnly(message: string): boolean {
@@ -60,7 +58,7 @@ function isFormattingOnly(message: string): boolean {
 
 export function isMergeCommit(message: string): boolean {
   const lowerMessage = message.toLowerCase();
-  return /^merge/i.test(lowerMessage);
+  return /^merged?\b/i.test(lowerMessage);
 }
 
 export function isMeaningfulCommit(message: string): boolean {

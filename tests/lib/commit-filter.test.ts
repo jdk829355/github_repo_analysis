@@ -171,6 +171,36 @@ describe('commit-filter', () => {
     });
   });
 
+  describe('word boundaries', () => {
+    it.each([
+      'Dockerize API server',
+      'Document upload API 추가',
+      'styled-components 도입',
+      'linter 설정 추가',
+      'formatter 도입',
+      'Mergeable PR 상태 표시 추가',
+      'Memoize selector results',
+      'Archiver 모듈 추가',
+    ])('should keep "%s"', (message) => {
+      expect(isMeaningfulCommit(message)).toBe(true);
+    });
+
+    it.each([
+      'docs: README 수정',
+      'doc update',
+      'style: 들여쓰기',
+      "Merge branch 'main'",
+      'chore: deps',
+    ])('should filter "%s"', (message) => {
+      expect(isMeaningfulCommit(message)).toBe(false);
+    });
+
+    it('should not treat words starting with "merge" as merge commits', () => {
+      expect(isMergeCommit('Mergeable PR 상태 표시 추가')).toBe(false);
+      expect(isMergeCommit("Merge branch 'main'")).toBe(true);
+    });
+  });
+
   describe('filterCommits', () => {
     it('should return empty array for empty input', () => {
       expect(filterCommits([])).toEqual([]);

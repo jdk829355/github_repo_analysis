@@ -99,11 +99,23 @@ export async function GET(
         initialState = await getJobState(jobId);
       } catch {
       }
+      let initialError: string | undefined;
+      if (initialState === 'FAILED') {
+        try {
+          const job = await prisma.analysis_jobs.findUnique({
+            where: { id: jobId },
+            select: { error_message: true },
+          });
+          initialError = job?.error_message ?? undefined;
+        } catch {
+        }
+      }
       send(
         `data: ${JSON.stringify({
           type: 'state',
           state: initialState ?? 'PENDING',
           jobId,
+          ...(initialError ? { error: initialError } : {}),
         })}\n\n`
       );
 

@@ -167,10 +167,6 @@ function AnalysisProgressClient({
     setCompletedRepos([]);
     setCurrentRepo(null);
     hasNavigated.current = false;
-    if (jobId) {
-      const eventSource = new EventSource(`/api/analysis/${jobId}/events`);
-      eventSourceRef.current = eventSource;
-    }
   };
 
   const progressPercent = totalRepos > 0 ? (completedRepos.length / totalRepos) * 100 : 0;

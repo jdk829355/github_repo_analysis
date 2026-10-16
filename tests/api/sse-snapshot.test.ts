@@ -7,9 +7,12 @@ jest.mock('../../lib/config', () => ({
 jest.mock('../../services/cache', () => ({
   getJobRepoList: jest.fn().mockResolvedValue(null),
 }));
+const mockJobFindUnique = jest.fn();
+
 jest.mock('../../lib/prisma', () => ({
   prisma: {
     repositories: { findMany: jest.fn().mockResolvedValue([]) },
+    analysis_jobs: { findUnique: (...args: unknown[]) => mockJobFindUnique(...args) },
   },
 }));
 jest.mock('../../lib/queue', () => ({
@@ -92,6 +95,23 @@ describe('GET /api/analysis/[jobId]/events snapshot ordering', () => {
     expect(result).not.toBe('timeout');
     expect((result as ReadableStreamReadResult<Uint8Array>).done).toBe(true);
     expect(mockQuit).toHaveBeenCalled();
+  });
+
+  it('includes the stored error message when the snapshot state is FAILED', async () => {
+    (getJobState as jest.Mock).mockResolvedValue('FAILED');
+    mockJobFindUnique.mockResolvedValue({ error_message: 'GEMINI_API_KEY environment variable is not set' });
+
+    const response = await GET(createRequest() as any, {
+      params: Promise.resolve({ jobId: 'job-123' }),
+    });
+
+    const reader = response.body!.getReader();
+    const first = await reader.read();
+    const event = JSON.parse(new TextDecoder().decode(first.value!).replace(/^data: /, ''));
+    expect(event.state).toBe('FAILED');
+    expect(event.error).toBe('GEMINI_API_KEY environment variable is not set');
+
+    reader.releaseLock();
   });
 
   it('ignores Redis messages that arrive after the client cancelled the stream', async () => {

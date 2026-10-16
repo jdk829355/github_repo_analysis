@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getGeminiApiKey } from '../lib/config';
+import { getLlmApiKey } from '../lib/config';
 import { GeminiAPIError } from '../lib/errors';
 import { ANALYSIS_TIMEOUT_MS, README_MAX_SIZE_BYTES } from '../lib/constants';
 import { truncateToMaxSize } from '../lib/utils';
@@ -28,7 +28,7 @@ type ParsedOutput<T> = {
 };
 
 function createClient(): GoogleGenerativeAI {
-  return new GoogleGenerativeAI(getGeminiApiKey());
+  return new GoogleGenerativeAI(getLlmApiKey());
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {

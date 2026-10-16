@@ -13,8 +13,16 @@ export function getGitHubToken(): string {
   return getRequiredEnv('GITHUB_TOKEN');
 }
 
-export function getGeminiApiKey(): string {
-  return getRequiredEnv('GEMINI_API_KEY');
+export function getLlmBaseUrl(): string {
+  return getRequiredEnv('LLM_BASE_URL');
+}
+
+export function getLlmApiKey(): string {
+  return getRequiredEnv('LLM_API_KEY');
+}
+
+export function getLlmModel(): string {
+  return getRequiredEnv('LLM_MODEL');
 }
 
 export function getDatabaseUrl(): string {

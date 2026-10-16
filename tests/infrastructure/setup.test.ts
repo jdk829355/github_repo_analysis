@@ -67,7 +67,7 @@ describe('infrastructure setup', () => {
     it('should contain required environment variables', () => {
       const content = fs.readFileSync(envExamplePath, 'utf-8');
       expect(content).toContain('GITHUB_TOKEN');
-      expect(content).toContain('GEMINI_API_KEY');
+      expect(content).toContain('LLM_API_KEY');
       expect(content).toContain('DATABASE_URL');
       expect(content).toContain('REDIS_URL');
       expect(content).toContain('NEXT_PUBLIC_APP_URL');

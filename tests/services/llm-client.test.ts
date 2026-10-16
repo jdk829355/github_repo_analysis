@@ -31,7 +31,7 @@ describe('services/llm-client', () => {
     mockGenerateContent.mockReset();
     mockGetGenerativeModel.mockClear();
     mockGoogleGenerativeAI.mockClear();
-    process.env.GEMINI_API_KEY = 'test-gemini-key';
+    process.env.LLM_API_KEY = 'test-llm-key';
   });
 
   it('analyzeRepository validates structured output and returns data', async () => {
@@ -58,7 +58,7 @@ describe('services/llm-client', () => {
     const result = await analyzeRepository(input);
 
     expect(result).toEqual(validOutput);
-    expect(mockGoogleGenerativeAI).toHaveBeenCalledWith('test-gemini-key');
+    expect(mockGoogleGenerativeAI).toHaveBeenCalledWith('test-llm-key');
     expect(mockGetGenerativeModel).toHaveBeenCalledWith({
       model: 'gemini-2.5-flash-lite',
       generationConfig: {

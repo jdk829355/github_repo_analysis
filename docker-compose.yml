@@ -10,7 +10,9 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - PRISMA_QUERY_ENGINE_LIBRARY=/app/node_modules/.prisma/client/libquery_engine-linux-musl-arm64-openssl-3.0.x.so.node
     depends_on:
@@ -28,7 +30,9 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
       - PRISMA_QUERY_ENGINE_LIBRARY=/app/node_modules/.prisma/client/libquery_engine-linux-musl-arm64-openssl-3.0.x.so.node
     depends_on:
       # - postgres

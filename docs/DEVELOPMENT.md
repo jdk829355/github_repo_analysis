@@ -6,13 +6,17 @@
 
 ```env
 GITHUB_TOKEN=
-GEMINI_API_KEY=
+LLM_BASE_URL=
+LLM_API_KEY=
+LLM_MODEL=
 
 DATABASE_URL=
 REDIS_URL=
 
 NEXT_PUBLIC_APP_URL=
 ```
+
+`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` 세 개는 모두 필수이고 기본값이 없다. 값이 없으면 LLM을 호출하는 시점에 오류가 난다.
 
 Docker 이미지에서는 이 외에 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`(시스템 Chromium 경로)와 `PDF_EXPORT_DIR`(PDF 저장 경로)을 설정한다.
 
@@ -31,7 +35,7 @@ Docker 이미지에서는 이 외에 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`(시�
 ### Architecture Rules
 
 * service layer 분리
-* UI layer에서 Gemini 직접 호출 금지
+* UI layer에서 LLM 직접 호출 금지
 * pure function 우선
 * utility 함수 테스트 가능 구조 유지
 * Queue와 Worker 모듈 분리: Worker는 worker 진입점에서만 만든다

@@ -20,8 +20,8 @@
 
 ### AI
 
-* Gemini `gemini-2.5-flash-lite`
-* JSON 응답(`responseMimeType: application/json`) 사용
+* OpenAI 호환 endpoint(현재 DeepSeek)를 사용한다. base URL, API key, model은 환경 변수로 받는다
+* JSON 응답(`response_format: json_object`) 사용
 * temperature 0.1
 * Zod 스키마로 응답 검증
 
@@ -183,9 +183,8 @@ LLM은 반드시 structured output을 사용해야 한다.
 
 * raw freeform response 금지
 * zod validation 필수
-* malformed response retry 수행
 * 낮은 temperature(0.1) 사용
-* schema mismatch 시 재시도 수행
+* 빈 응답, malformed response, schema mismatch가 나오면 앱이 재시도한다(9절 참조)
 
 ---
 
@@ -210,11 +209,18 @@ LLM은 반드시 structured output을 사용해야 한다.
 
 ---
 
-### Gemini API
+### LLM API
 
-* malformed output retry
-* timeout retry
-* retry max 2
+호출 자체가 실패한 경우는 SDK가, 응답 내용이 잘못된 경우는 앱이 재시도한다.
+
+| 오류 | 재시도 | 횟수 | 대기 |
+|---|---|---|---|
+| 429, 5xx, 연결 오류, 타임아웃 | SDK | 2 | SDK의 지수 백오프 |
+| 400, 401, 403, 404 등 | 없음 | 0 | — |
+| 빈 응답, JSON 파싱 실패, Zod 검증 실패 | 앱 | 2 | 1초, 2초 |
+
+* 앱은 SDK 오류를 다시 시도하지 않는다. 둘 다 재시도하면 호출이 최대 9번까지 나간다.
+* 호출 1회의 타임아웃은 2분이다. 전체 분석 타임아웃(10분)과는 별개다.
 
 ---
 

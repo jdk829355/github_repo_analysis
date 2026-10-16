@@ -11,13 +11,13 @@ export class GitHubAPIError extends Error {
   }
 }
 
-export class GeminiAPIError extends Error {
+export class LLMAPIError extends Error {
   public readonly statusCode: number;
   public readonly rawResponse?: string;
 
   constructor(message: string, statusCode: number, rawResponse?: string) {
     super(message);
-    this.name = 'GeminiAPIError';
+    this.name = 'LLMAPIError';
     this.statusCode = statusCode;
     this.rawResponse = rawResponse;
     Error.captureStackTrace(this, this.constructor);

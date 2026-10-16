@@ -24,17 +24,45 @@ describe('lib/config', () => {
     });
   });
 
-  describe('getGeminiApiKey', () => {
-    it('should return GEMINI_API_KEY from env', () => {
-      process.env.GEMINI_API_KEY = 'gemini-test-key';
-      const { getGeminiApiKey } = require('../../lib/config');
-      expect(getGeminiApiKey()).toBe('gemini-test-key');
+  describe('getLlmBaseUrl', () => {
+    it('should return LLM_BASE_URL from env', () => {
+      process.env.LLM_BASE_URL = 'https://api.deepseek.com';
+      const { getLlmBaseUrl } = require('../../lib/config');
+      expect(getLlmBaseUrl()).toBe('https://api.deepseek.com');
     });
 
-    it('should throw error if GEMINI_API_KEY is not set', () => {
-      delete process.env.GEMINI_API_KEY;
-      const { getGeminiApiKey } = require('../../lib/config');
-      expect(() => getGeminiApiKey()).toThrow('GEMINI_API_KEY environment variable is not set');
+    it('should throw error if LLM_BASE_URL is not set', () => {
+      delete process.env.LLM_BASE_URL;
+      const { getLlmBaseUrl } = require('../../lib/config');
+      expect(() => getLlmBaseUrl()).toThrow('LLM_BASE_URL environment variable is not set');
+    });
+  });
+
+  describe('getLlmApiKey', () => {
+    it('should return LLM_API_KEY from env', () => {
+      process.env.LLM_API_KEY = 'llm-test-key';
+      const { getLlmApiKey } = require('../../lib/config');
+      expect(getLlmApiKey()).toBe('llm-test-key');
+    });
+
+    it('should throw error if LLM_API_KEY is not set', () => {
+      delete process.env.LLM_API_KEY;
+      const { getLlmApiKey } = require('../../lib/config');
+      expect(() => getLlmApiKey()).toThrow('LLM_API_KEY environment variable is not set');
+    });
+  });
+
+  describe('getLlmModel', () => {
+    it('should return LLM_MODEL from env', () => {
+      process.env.LLM_MODEL = 'deepseek-chat';
+      const { getLlmModel } = require('../../lib/config');
+      expect(getLlmModel()).toBe('deepseek-chat');
+    });
+
+    it('should throw error if LLM_MODEL is not set', () => {
+      delete process.env.LLM_MODEL;
+      const { getLlmModel } = require('../../lib/config');
+      expect(() => getLlmModel()).toThrow('LLM_MODEL environment variable is not set');
     });
   });
 

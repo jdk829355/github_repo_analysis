@@ -1,125 +1,158 @@
-import { GeminiAPIError } from '../../lib/errors';
-import { ANALYSIS_TIMEOUT_MS } from '../../lib/constants';
+import { LLM_REQUEST_TIMEOUT_MS } from '../../lib/constants';
 import type {
   RepositoryAnalysisInput,
   ProfileAggregationInput,
 } from '../../prompts/types';
 
-const mockGenerateContent = jest.fn();
-const mockGetGenerativeModel = jest.fn(() => ({
-  generateContent: mockGenerateContent,
-}));
-const mockGoogleGenerativeAI = jest.fn(() => ({
-  getGenerativeModel: mockGetGenerativeModel,
+const mockCreate = jest.fn();
+const mockOpenAI = jest.fn(() => ({
+  chat: { completions: { create: mockCreate } },
 }));
 
-jest.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: mockGoogleGenerativeAI,
+jest.mock('openai', () => ({
+  ...jest.requireActual('openai'),
+  __esModule: true,
+  default: mockOpenAI,
 }));
 
-function createResponse(text: string) {
-  return {
-    response: {
-      text: jest.fn().mockResolvedValue(text),
-    },
-  };
+function createResponse(content: string | null) {
+  return { choices: [{ message: { content } }] };
 }
+
+const validRepositoryOutput = {
+  repositoryName: 'test-repo',
+  summary: 'Test summary',
+  projectType: 'web-app',
+  estimatedRoles: ['Backend'],
+  mainContributions: ['Implemented API'],
+  techStack: ['Node.js'],
+  leadershipSignals: [],
+  confidence: 0.8,
+};
+
+const repositoryInput: RepositoryAnalysisInput = {
+  repositoryName: 'test-repo',
+  readme: '# Test',
+};
+
+const profileInput: ProfileAggregationInput = {
+  username: 'testuser',
+  repositoryAnalyses: [
+    {
+      repositoryName: 'repo',
+      summary: 'Summary',
+      projectType: 'api',
+      estimatedRoles: ['Backend'],
+      mainContributions: ['API'],
+      techStack: ['Node.js'],
+      leadershipSignals: [],
+      confidence: 0.7,
+    },
+  ],
+};
 
 describe('services/llm-client', () => {
   beforeEach(() => {
-    jest.resetModules();
-    mockGenerateContent.mockReset();
-    mockGetGenerativeModel.mockClear();
-    mockGoogleGenerativeAI.mockClear();
-    process.env.GEMINI_API_KEY = 'test-gemini-key';
+    mockCreate.mockReset();
+    mockOpenAI.mockClear();
+    process.env.LLM_BASE_URL = 'https://llm.example.com';
+    process.env.LLM_API_KEY = 'test-llm-key';
+    process.env.LLM_MODEL = 'test-model';
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('analyzeRepository validates structured output and returns data', async () => {
-    const validOutput = {
-      repositoryName: 'test-repo',
-      summary: 'Test summary',
-      projectType: 'web-app',
-      estimatedRoles: ['Backend'],
-      mainContributions: ['Implemented API'],
-      techStack: ['Node.js'],
-      leadershipSignals: [],
-      confidence: 0.8,
-    };
-
-    mockGenerateContent.mockResolvedValueOnce(createResponse(JSON.stringify(validOutput)));
+    mockCreate.mockResolvedValueOnce(createResponse(JSON.stringify(validRepositoryOutput)));
 
     const { analyzeRepository } = await import('../../services/llm-client');
+    const result = await analyzeRepository(repositoryInput);
 
-    const input: RepositoryAnalysisInput = {
-      repositoryName: 'test-repo',
-      readme: '# Test',
-    };
-
-    const result = await analyzeRepository(input);
-
-    expect(result).toEqual(validOutput);
-    expect(mockGoogleGenerativeAI).toHaveBeenCalledWith('test-gemini-key');
-    expect(mockGetGenerativeModel).toHaveBeenCalledWith({
-      model: 'gemini-2.5-flash-lite',
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 16384,
-        responseMimeType: 'application/json',
-      },
+    expect(result).toEqual(validRepositoryOutput);
+    expect(mockOpenAI).toHaveBeenCalledWith({
+      baseURL: 'https://llm.example.com',
+      apiKey: 'test-llm-key',
+      timeout: LLM_REQUEST_TIMEOUT_MS,
+      maxRetries: 2,
+    });
+    expect(mockCreate).toHaveBeenCalledWith({
+      model: 'test-model',
+      messages: [{ role: 'user', content: expect.stringContaining('test-repo') }],
+      temperature: 0.1,
+      max_tokens: 16384,
+      response_format: { type: 'json_object' },
     });
   });
 
   it('analyzeRepository retries on malformed JSON and succeeds', async () => {
-    const validOutput = {
-      repositoryName: 'retry-repo',
-      summary: 'Retry summary',
-      projectType: 'cli',
-      estimatedRoles: ['DevOps'],
-      mainContributions: ['Automation'],
-      techStack: ['Bash'],
-      leadershipSignals: [],
-      confidence: 0.6,
-    };
-
-    mockGenerateContent
+    jest.useFakeTimers();
+    mockCreate
       .mockResolvedValueOnce(createResponse('not-json'))
-      .mockResolvedValueOnce(createResponse(JSON.stringify(validOutput)));
+      .mockResolvedValueOnce(createResponse(JSON.stringify(validRepositoryOutput)));
 
     const { analyzeRepository } = await import('../../services/llm-client');
+    const promise = analyzeRepository(repositoryInput);
+    await jest.advanceTimersByTimeAsync(1000);
 
-    const input: RepositoryAnalysisInput = {
-      repositoryName: 'retry-repo',
-    };
-
-    const result = await analyzeRepository(input);
-
-    expect(result).toEqual(validOutput);
-    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    await expect(promise).resolves.toEqual(validRepositoryOutput);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 
-  it('analyzeRepository throws GeminiAPIError after max retries on schema mismatch', async () => {
-    const invalidOutput = {
-      repositoryName: 'bad-repo',
-      summary: 'Missing fields',
-    };
-
-    mockGenerateContent
-      .mockResolvedValueOnce(createResponse(JSON.stringify(invalidOutput)))
-      .mockResolvedValueOnce(createResponse(JSON.stringify(invalidOutput)))
-      .mockResolvedValueOnce(createResponse(JSON.stringify(invalidOutput)));
+  it.each([null, ''])('analyzeRepository retries on empty response (%p)', async (content) => {
+    jest.useFakeTimers();
+    mockCreate
+      .mockResolvedValueOnce(createResponse(content))
+      .mockResolvedValueOnce(createResponse(JSON.stringify(validRepositoryOutput)));
 
     const { analyzeRepository } = await import('../../services/llm-client');
+    const promise = analyzeRepository(repositoryInput);
+    await jest.advanceTimersByTimeAsync(1000);
 
-    const input: RepositoryAnalysisInput = {
-      repositoryName: 'bad-repo',
-    };
+    await expect(promise).resolves.toEqual(validRepositoryOutput);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
 
-    const promise = analyzeRepository(input);
-    await expect(promise).rejects.toMatchObject({
-      name: 'GeminiAPIError',
+  it('analyzeRepository throws LLMAPIError after max retries on schema mismatch', async () => {
+    jest.useFakeTimers();
+    const invalidOutput = { repositoryName: 'bad-repo', summary: 'Missing fields' };
+    mockCreate.mockResolvedValue(createResponse(JSON.stringify(invalidOutput)));
+
+    const { analyzeRepository } = await import('../../services/llm-client');
+    const promise = analyzeRepository(repositoryInput);
+    const rejection = expect(promise).rejects.toMatchObject({
+      name: 'LLMAPIError',
+      message: 'Schema validation failed',
     });
-    await expect(promise).rejects.toThrow('Schema validation failed');
-    expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+    await jest.advanceTimersByTimeAsync(1000 + 2000);
+
+    await rejection;
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+  });
+
+  it('waits 1s then 2s between retries', async () => {
+    jest.useFakeTimers();
+    mockCreate.mockResolvedValue(createResponse('not-json'));
+
+    const { analyzeRepository } = await import('../../services/llm-client');
+    const promise = analyzeRepository(repositoryInput);
+    const rejection = expect(promise).rejects.toMatchObject({ name: 'LLMAPIError' });
+
+    await jest.advanceTimersByTimeAsync(0);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(999);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+
+    await jest.advanceTimersByTimeAsync(1999);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+
+    await rejection;
   });
 
   it('aggregateProfile validates structured output and returns data', async () => {
@@ -135,64 +168,53 @@ describe('services/llm-client', () => {
       greenFlags: ['API design evidence'],
       redFlags: ['Limited testing evidence'],
     };
-
-    mockGenerateContent.mockResolvedValueOnce(createResponse(JSON.stringify(validOutput)));
+    mockCreate.mockResolvedValueOnce(createResponse(JSON.stringify(validOutput)));
 
     const { aggregateProfile } = await import('../../services/llm-client');
-
-    const input: ProfileAggregationInput = {
-      username: 'testuser',
-      repositoryAnalyses: [
-        {
-          repositoryName: 'repo',
-          summary: 'Summary',
-          projectType: 'api',
-          estimatedRoles: ['Backend'],
-          mainContributions: ['API'],
-          techStack: ['Node.js'],
-          leadershipSignals: [],
-          confidence: 0.7,
-        },
-      ],
-    };
-
-    const result = await aggregateProfile(input);
+    const result = await aggregateProfile(profileInput);
 
     expect(result).toEqual(validOutput);
   });
 
-  it('aggregateProfile retries on timeout and throws after max retries', async () => {
-    jest.useFakeTimers();
+  describe('SDK errors are not retried by the app', () => {
+    it('wraps an HTTP error and keeps its status code', async () => {
+      const { AuthenticationError } = jest.requireActual('openai');
+      mockCreate.mockRejectedValue(
+        new AuthenticationError(401, { message: 'bad key' }, 'bad key', new Headers())
+      );
 
-    mockGenerateContent.mockImplementation(() => new Promise(() => {}));
+      const { aggregateProfile } = await import('../../services/llm-client');
 
-    const { aggregateProfile } = await import('../../services/llm-client');
+      await expect(aggregateProfile(profileInput)).rejects.toMatchObject({
+        name: 'LLMAPIError',
+        statusCode: 401,
+      });
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
 
-    const input: ProfileAggregationInput = {
-      username: 'timeout-user',
-      repositoryAnalyses: [
-        {
-          repositoryName: 'repo',
-          summary: 'Summary',
-          projectType: 'api',
-          estimatedRoles: ['Backend'],
-          mainContributions: ['API'],
-          techStack: ['Node.js'],
-          leadershipSignals: [],
-          confidence: 0.7,
-        },
-      ],
-    };
+    it('maps a timeout to 408', async () => {
+      const { APIConnectionTimeoutError } = jest.requireActual('openai');
+      mockCreate.mockRejectedValue(new APIConnectionTimeoutError());
 
-    const promise = aggregateProfile(input);
-    const rejection = expect(promise).rejects.toMatchObject({ name: 'GeminiAPIError' });
+      const { aggregateProfile } = await import('../../services/llm-client');
+      const promise = aggregateProfile(profileInput);
 
-    await jest.advanceTimersByTimeAsync(ANALYSIS_TIMEOUT_MS * 3 + 50);
+      await expect(promise).rejects.toMatchObject({ name: 'LLMAPIError', statusCode: 408 });
+      await expect(promise).rejects.toThrow('LLM request timed out');
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
 
-    await rejection;
-    await expect(promise).rejects.toThrow('Gemini request timed out');
-    expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+    it('maps a connection error to 503', async () => {
+      const { APIConnectionError } = jest.requireActual('openai');
+      mockCreate.mockRejectedValue(new APIConnectionError({}));
 
-    jest.useRealTimers();
+      const { aggregateProfile } = await import('../../services/llm-client');
+
+      await expect(aggregateProfile(profileInput)).rejects.toMatchObject({
+        name: 'LLMAPIError',
+        statusCode: 503,
+      });
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
   });
 });

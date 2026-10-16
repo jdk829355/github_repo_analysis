@@ -7,9 +7,8 @@ x-logging: &default-logging
 
 services:
   next-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # CI가 GHCR에 올린 이미지를 쓴다. 롤백은 IMAGE_TAG=<커밋 SHA>로 지정한다.
+    image: ghcr.io/jdk829355/github_repo_analysis:${IMAGE_TAG:-latest}
     restart: unless-stopped
     logging: *default-logging
     ports:
@@ -29,10 +28,7 @@ services:
       - redis
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
+    image: ghcr.io/jdk829355/github_repo_analysis:${IMAGE_TAG:-latest}
     command: ["node", "dist/workers/index.js"]
     restart: unless-stopped
     logging: *default-logging

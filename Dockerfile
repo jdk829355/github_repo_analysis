@@ -16,6 +16,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# lib/queue.ts가 import 시점에 REDIS_URL을 읽어서 next build에도 값이 필요하다.
+# 빌드 전용 더미 값이며 runner 이미지에는 들어가지 않는다(실제 값은 compose가 주입).
+ENV REDIS_URL=redis://localhost:6379
 RUN npx prisma generate
 RUN npm run build
 RUN npx tsc --project tsconfig.worker.json

@@ -161,7 +161,7 @@ describe('services/analysis/profile-aggregation', () => {
     });
   });
 
-  it('stores fallback report and publishes failure on LLM error', async () => {
+  it('marks job FAILED without storing a report on LLM error', async () => {
     mockRepositoriesFindMany.mockResolvedValue([{ id: 'repo-1' }]);
     mockRepositoryAnalysesFindMany.mockResolvedValue([
       createRepoAnalysis({ summary: 'Repo summary' }),
@@ -177,24 +177,8 @@ describe('services/analysis/profile-aggregation', () => {
       where: { id: 'job-1' },
       data: { status: 'FAILED', error_message: 'LLM failed' },
     });
-    expect(mockProfileReportsCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        analysis_job_id: 'job-1',
-        overall_summary: 'aggregation_failed',
-        role_estimation: {
-          primary: 'Backend',
-          secondary: [],
-          recommended: [],
-        },
-        engineering_strengths: ['Repo summary'],
-        collaboration_patterns: [],
-        green_flags: ['Repo summary'],
-        red_flags: ['프로필 집계에 실패하여 비판적 신호를 충분히 도출하지 못했습니다.'],
-        widget_svg_light: expect.stringContaining('<svg'),
-        widget_svg_dark: expect.stringContaining('<svg'),
-        widget_svg_updated_at: expect.any(Date),
-      }),
-    });
+    expect(mockProfileReportsCreate).not.toHaveBeenCalled();
+    expect(mockProfileReportsUpdate).not.toHaveBeenCalled();
     expect(mockPublishEvent).toHaveBeenCalledWith('job-1', {
       type: 'aggregation_failed',
       error: 'LLM failed',

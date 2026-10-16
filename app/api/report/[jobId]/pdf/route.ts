@@ -17,7 +17,7 @@ export async function GET(
     },
   });
 
-  if (!job || !job.profile_report) {
+  if (!job || !job.profile_report || job.status !== 'COMPLETED') {
     return NextResponse.json(
       { error: 'Report not found' },
       { status: 404 }

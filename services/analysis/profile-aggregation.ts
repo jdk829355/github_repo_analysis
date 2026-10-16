@@ -153,53 +153,6 @@ export async function aggregateProfile(
       data: { status: 'FAILED', error_message: fullError },
     });
 
-    const existingReport = await prisma.profile_reports.findUnique({
-      where: { analysis_job_id: input.jobId },
-    });
-
-    const fallbackData = {
-      overall_summary: 'aggregation_failed',
-      role_estimation: {
-        primary: 'Backend',
-        secondary: [],
-        recommended: [],
-      },
-      engineering_strengths: completedAnalyses.map((analysis) => analysis.summary),
-      collaboration_patterns: [],
-      green_flags: completedAnalyses.map((analysis) => analysis.summary),
-      red_flags: ['프로필 집계에 실패하여 비판적 신호를 충분히 도출하지 못했습니다.'],
-    };
-    const fallbackWidgetSvgs = renderWidgetSvgVariants({
-      githubUsername: input.username,
-      overallSummary: fallbackData.overall_summary,
-      roleEstimation: fallbackData.role_estimation,
-      greenFlags: fallbackData.green_flags,
-      redFlags: fallbackData.red_flags,
-      repositories: repositoryIds.map((repository) => ({
-        language: repository.primary_language || '',
-      })),
-    });
-    const fallbackReportData = {
-      ...fallbackData,
-      widget_svg_light: fallbackWidgetSvgs.light,
-      widget_svg_dark: fallbackWidgetSvgs.dark,
-      widget_svg_updated_at: new Date(),
-    };
-
-    if (existingReport) {
-      await prisma.profile_reports.update({
-        where: { analysis_job_id: input.jobId },
-        data: fallbackReportData,
-      });
-    } else {
-      await prisma.profile_reports.create({
-        data: {
-          analysis_job_id: input.jobId,
-          ...fallbackReportData,
-        },
-      });
-    }
-
     await publishEvent(input.jobId, {
       type: 'aggregation_failed',
       error: fullError,

@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     },
   });
 
-  if (!job?.profile_report) {
+  if (!job?.profile_report || job.status !== 'COMPLETED') {
     return new NextResponse('Widget not found', {
       status: 404,
       headers: {

@@ -57,6 +57,28 @@ describe('GET /api/report/[jobId]', () => {
     expect(response.status).toBe(404);
   });
 
+  it('returns 404 when job is FAILED even if a profile report is stored', async () => {
+    mockAnalysisJobsFindUnique.mockResolvedValue({
+      id: 'job-123',
+      status: 'FAILED',
+      profile_report: {
+        overall_summary: 'aggregation_failed',
+        role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
+        engineering_strengths: [],
+        collaboration_patterns: [],
+        green_flags: [],
+        red_flags: [],
+      },
+      repositories: [],
+    });
+
+    const request = new Request('http://localhost/api/report/job-123');
+    const response = await getReport(request as any, {
+      params: Promise.resolve({ jobId: 'job-123' }),
+    });
+    expect(response.status).toBe(404);
+  });
+
   it('returns profile report when found', async () => {
     mockAnalysisJobsFindUnique.mockResolvedValue({
       id: 'job-123',
@@ -115,6 +137,30 @@ describe('GET /api/report/[jobId]', () => {
       params: Promise.resolve({ jobId: 'job-123' }),
     });
     expect(response.status).toBe(404);
+  });
+
+  it('returns 404 for PDF when job is FAILED even if a profile report is stored', async () => {
+    mockAnalysisJobsFindUnique.mockResolvedValue({
+      id: 'job-123',
+      status: 'FAILED',
+      profile_report: {
+        overall_summary: 'aggregation_failed',
+        role_estimation: { primary: 'Backend', secondary: [], recommended: [] },
+        engineering_strengths: [],
+        collaboration_patterns: [],
+        green_flags: [],
+        red_flags: [],
+      },
+      repositories: [],
+      pdf_exports: [],
+    });
+
+    const request = new Request('http://localhost/api/report/job-123/pdf');
+    const response = await getPdf(request as any, {
+      params: Promise.resolve({ jobId: 'job-123' }),
+    });
+    expect(response.status).toBe(404);
+    expect(mockGenerateReportPdf).not.toHaveBeenCalled();
   });
 
   it('regenerates and returns PDF when an export record already exists', async () => {

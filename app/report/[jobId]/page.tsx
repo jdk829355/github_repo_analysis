@@ -73,7 +73,7 @@ async function getReport(jobId: string) {
     },
   });
 
-  if (!job?.profile_report) return null;
+  if (!job?.profile_report || job.status !== 'COMPLETED') return null;
   const report = normalizeReport(job.profile_report as unknown as PrismaProfileReport);
   report.repositories = (job.repositories || []).map((r: any) => ({
     name: r.name,

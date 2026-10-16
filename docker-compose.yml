@@ -1,8 +1,17 @@
+# 컨테이너 로그가 디스크를 채우지 않도록 서비스마다 최대 30MB만 보관한다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   next-app:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3000:3000"
     environment:
@@ -25,6 +34,8 @@ services:
       dockerfile: Dockerfile
       target: runner
     command: ["node", "dist/workers/index.js"]
+    restart: unless-stopped
+    logging: *default-logging
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
@@ -52,6 +63,8 @@ services:
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
+    restart: unless-stopped
+    logging: *default-logging
     ports:
       - "6379:6379"
     volumes:

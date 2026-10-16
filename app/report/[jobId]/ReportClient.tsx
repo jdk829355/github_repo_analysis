@@ -440,15 +440,6 @@ export default function ReportClient({ jobId, initialReport }: ReportClientProps
             </svg>
             <span>SVG 위젯 내보내기</span>
           </button>
-          <a
-            href={`/api/report/${jobId}/pdf`}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#c1c6d5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#414753] transition-colors hover:border-[#717785] hover:text-[#181c22]"
-          >
-            <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14" />
-            </svg>
-            <span>PDF 다운로드</span>
-          </a>
         </div>
       </header>
 

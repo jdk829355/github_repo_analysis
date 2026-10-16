@@ -16,7 +16,7 @@ export interface WidgetReport {
 }
 
 export type WidgetTheme = 'light' | 'dark';
-export const WIDGET_SVG_VERSION = 'inner-card-v3';
+export const WIDGET_SVG_VERSION = 'inner-card-v4';
 
 const WIDGET_THEMES: Record<WidgetTheme, {
   background: string;
@@ -181,7 +181,7 @@ export function renderWidgetSvg(report: WidgetReport, theme: WidgetTheme = 'ligh
   const summaryLines = toLines(report.overallSummary, 70, 3);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="876" height="616" viewBox="0 0 876 616" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" data-widget-version="${WIDGET_SVG_VERSION}">
+<svg width="613" height="431" viewBox="0 0 876 616" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" data-widget-version="${WIDGET_SVG_VERSION}">
   <title id="title">Pinned Signal GitHub profile analysis widget</title>
   <desc id="desc">A GitHub profile analysis summary with green flags and growth areas.</desc>
   <rect x="0.5" y="0.5" width="875" height="615" rx="22" fill="${colors.card}" stroke="${colors.border}"/>

@@ -590,6 +590,50 @@ describe('services/analysis/orchestrator', () => {
         },
       });
     });
+
+    // 타임아웃 시점에 진행 중이던 저장소 분석이 끝난 뒤 남은 작업이 이어지는지 본다.
+    async function runUntilTimeoutThenFinishInFlightRepo(repoNames: string[]) {
+      mockCheckJobDeduplication.mockResolvedValue(null);
+      mockAnalysisJobsCreate.mockResolvedValue({ id: jobId });
+      mockAnalysisJobsUpdate.mockResolvedValue({ id: jobId });
+      mockGetUserPinnedRepositories.mockResolvedValue({
+        repositories: repoNames.map((name, index) => ({
+          id: index + 1,
+          name,
+          full_name: `testuser/${name}`,
+        })),
+        filteredCount: 0,
+      });
+      let finishInFlightRepo: (value: unknown) => void = () => {};
+      mockAnalyzeRepositoryPipeline
+        .mockReset()
+        .mockImplementationOnce(() => new Promise((resolve) => { finishInFlightRepo = resolve; }))
+        .mockResolvedValue({ status: 'COMPLETED', analysis: { repositoryName: 'any' } });
+      mockAggregateProfile.mockResolvedValue({ overallSummary: 'A skilled developer' });
+
+      const { startAnalysis } = setupMocks();
+      await expect(startAnalysis(username, githubUrl)).rejects.toThrow(
+        `Analysis timed out after ${ANALYSIS_TIMEOUT_MS}ms`
+      );
+
+      finishInFlightRepo({ status: 'COMPLETED', analysis: { repositoryName: repoNames[0] } });
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    it('does not analyze remaining repos after timeout', async () => {
+      await runUntilTimeoutThenFinishInFlightRepo(['repo-a', 'repo-b']);
+
+      expect(mockAnalyzeRepositoryPipeline).toHaveBeenCalledTimes(1);
+      expect(mockAggregateProfile).not.toHaveBeenCalled();
+      expect(mockProfileReportsCreate).not.toHaveBeenCalled();
+    });
+
+    it('does not aggregate the profile after timeout', async () => {
+      await runUntilTimeoutThenFinishInFlightRepo(['repo-a']);
+
+      expect(mockAggregateProfile).not.toHaveBeenCalled();
+      expect(mockProfileReportsCreate).not.toHaveBeenCalled();
+    });
   });
 
   describe('timeout timer cleanup', () => {

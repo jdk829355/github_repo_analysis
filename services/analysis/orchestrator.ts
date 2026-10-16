@@ -239,9 +239,12 @@ export async function runAnalysisPipeline(
     }
 
     const deps = createRepoAnalysisDeps();
+    // Promise.race는 analysisWork를 멈추지 않으므로 타임아웃 뒤에는 다음 단계로 넘어가지 않게 한다.
+    let timedOut = false;
 
     const analysisWork = async () => {
       for (const repo of reposToAnalyze) {
+        if (timedOut) return;
         const result = await analyzeRepositoryPipeline(
           {
             jobId,
@@ -260,6 +263,8 @@ export async function runAnalysisPipeline(
           repoCounts.failed++;
         }
       }
+
+      if (timedOut) return;
 
       if (canReuseProfileReport && previousProfileReport) {
         profileReused = true;
@@ -310,6 +315,7 @@ export async function runAnalysisPipeline(
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
+        timedOut = true;
         reject(
           new AnalysisError(
             `Analysis timed out after ${ANALYSIS_TIMEOUT_MS}ms`,

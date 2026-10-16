@@ -289,8 +289,9 @@ export async function runAnalysisPipeline(
       }
     };
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(
           new AnalysisError(
             `Analysis timed out after ${ANALYSIS_TIMEOUT_MS}ms`,
@@ -300,7 +301,11 @@ export async function runAnalysisPipeline(
       }, ANALYSIS_TIMEOUT_MS);
     });
 
-    await Promise.race([analysisWork(), timeoutPromise]);
+    try {
+      await Promise.race([analysisWork(), timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     await prisma.analysis_jobs.update({
       where: { id: jobId },

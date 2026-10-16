@@ -592,6 +592,48 @@ describe('services/analysis/orchestrator', () => {
     });
   });
 
+  describe('timeout timer cleanup', () => {
+    function mockSuccessfulPipeline() {
+      mockCheckJobDeduplication.mockResolvedValue(null);
+      mockAnalysisJobsCreate.mockResolvedValue({ id: jobId });
+      mockAnalysisJobsUpdate.mockResolvedValue({ id: jobId });
+      mockGetUserPinnedRepositories.mockResolvedValue({
+        repositories: [{ id: 1, name: 'repo-a', full_name: 'testuser/repo-a' }],
+        filteredCount: 0,
+      });
+      mockAnalyzeRepositoryPipeline.mockResolvedValue({
+        status: 'COMPLETED',
+        analysis: { repositoryName: 'repo-a' },
+      });
+      mockAggregateProfile.mockResolvedValue({ overallSummary: 'A skilled developer' });
+    }
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('leaves no pending timer after the pipeline completes', async () => {
+      jest.useFakeTimers();
+      mockSuccessfulPipeline();
+
+      const { startAnalysis } = setupMocks();
+      await startAnalysis(username, githubUrl);
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('leaves no pending timer after the pipeline fails', async () => {
+      jest.useFakeTimers();
+      mockSuccessfulPipeline();
+      mockAggregateProfile.mockRejectedValue(new Error('aggregation failed'));
+
+      const { startAnalysis } = setupMocks();
+      await expect(startAnalysis(username, githubUrl)).rejects.toThrow('aggregation failed');
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+  });
+
   describe('error handling', () => {
     it('marks FAILED and clears active on repo analysis error', async () => {
       mockCheckJobDeduplication.mockResolvedValue(null);

@@ -4,8 +4,10 @@ import {
   getRepositoryReadme,
   getRepositoryCommits,
   hasUserStarredRepository,
+  getUserPinnedRepositories,
 } from '../../services/github-client';
 import { GitHubAPIError } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 import { MAX_REPOS, MAX_COMMITS_PER_REPO, GITHUB_API_VERSION } from '../../lib/constants';
 
 describe('services/github-client', () => {
@@ -691,6 +693,71 @@ describe('services/github-client', () => {
       await getRepositoryCommits('testuser', 'testrepo');
 
       expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+  });
+
+  describe('logging', () => {
+    it('logs each REST retry with endpoint, status and delay', async () => {
+      const warn = jest.spyOn(logger, 'warn');
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(500, { message: 'Server error' }))
+        .mockResolvedValueOnce(createMockResponse(200, { login: 'testuser' }));
+
+      await getUserProfile('testuser');
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        {
+          event: 'github.retry',
+          endpoint: '/users/testuser',
+          status: 500,
+          attempt: 1,
+          delayMs: 100,
+          rateLimitRemaining: null,
+        },
+        'retrying GitHub request'
+      );
+    });
+
+    it('logs a GraphQL retry when the response has no data', async () => {
+      const warn = jest.spyOn(logger, 'warn');
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(200, {}))
+        .mockResolvedValueOnce(
+          createMockResponse(200, { data: { user: { pinnedItems: { nodes: [] } } } })
+        );
+
+      await getUserPinnedRepositories('testuser');
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'github.retry', endpoint: '/graphql', status: 500, attempt: 1 }),
+        'retrying GitHub request'
+      );
+    });
+
+    it('warns when the remaining rate limit drops below 100', async () => {
+      const warn = jest.spyOn(logger, 'warn');
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(200, { login: 'testuser' }, { 'x-ratelimit-remaining': '42' })
+      );
+
+      await getUserProfile('testuser');
+
+      expect(warn).toHaveBeenCalledWith(
+        { event: 'github.rate_limit_low', endpoint: '/users/testuser', remaining: 42 },
+        'GitHub rate limit running low'
+      );
+    });
+
+    it('does not warn when the rate limit is healthy', async () => {
+      const warn = jest.spyOn(logger, 'warn');
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(200, { login: 'testuser' }, { 'x-ratelimit-remaining': '4999' })
+      );
+
+      await getUserProfile('testuser');
+
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 });

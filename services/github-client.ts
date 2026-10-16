@@ -1,5 +1,6 @@
 import { getGitHubToken } from '../lib/config';
 import { GitHubAPIError } from '../lib/errors';
+import { logger } from '../lib/logger';
 import {
   MAX_REPOS,
   MAX_COMMITS_PER_REPO,
@@ -11,6 +12,8 @@ const GITHUB_API_BASE = 'https://api.github.com';
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 100;
 const MAX_PER_PAGE = 100;
+// 인증 요청 한도는 시간당 5,000이다. 이 아래로 떨어지면 곧 분석이 막힌다.
+const RATE_LIMIT_WARN_THRESHOLD = 100;
 
 interface RequestOptions {
   method?: string;
@@ -42,6 +45,26 @@ function isRetryableError(statusCode: number, rateLimitRemaining: string | null)
   return false;
 }
 
+function warnIfRateLimitLow(endpoint: string, rateLimitRemaining: string | null): void {
+  const remaining = rateLimitRemaining ? parseInt(rateLimitRemaining, 10) : NaN;
+  if (!isNaN(remaining) && remaining < RATE_LIMIT_WARN_THRESHOLD) {
+    logger.warn({ event: 'github.rate_limit_low', endpoint, remaining }, 'GitHub rate limit running low');
+  }
+}
+
+function logRetry(
+  endpoint: string,
+  status: number,
+  attempt: number,
+  delayMs: number,
+  rateLimitRemaining: string | null
+): void {
+  logger.warn(
+    { event: 'github.retry', endpoint, status, attempt: attempt + 1, delayMs, rateLimitRemaining },
+    'retrying GitHub request'
+  );
+}
+
 async function githubRequest(
   endpoint: string,
   options: RequestOptions = {}
@@ -57,6 +80,7 @@ async function githubRequest(
       });
 
       const rateLimitRemaining = response.headers.get('x-ratelimit-remaining');
+      warnIfRateLimitLow(endpoint, rateLimitRemaining);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -67,6 +91,7 @@ async function githubRequest(
 
         if (isRetryableError(response.status, rateLimitRemaining) && attempt < MAX_RETRIES) {
           const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          logRetry(endpoint, response.status, attempt, delay, rateLimitRemaining);
           await sleep(delay);
           continue;
         }
@@ -84,6 +109,7 @@ async function githubRequest(
         lastError = error;
         if (attempt < MAX_RETRIES && isRetryableError(error.statusCode, null)) {
           const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          logRetry(error.endpoint, error.statusCode, attempt, delay, null);
           await sleep(delay);
           continue;
         }
@@ -180,6 +206,7 @@ async function githubGraphQLRequest<T>(
       });
 
       const rateLimitRemaining = response.headers.get('x-ratelimit-remaining');
+      warnIfRateLimitLow('/graphql', rateLimitRemaining);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -190,6 +217,7 @@ async function githubGraphQLRequest<T>(
 
         if (isRetryableError(response.status, rateLimitRemaining) && attempt < MAX_RETRIES) {
           const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          logRetry('/graphql', response.status, attempt, delay, rateLimitRemaining);
           await sleep(delay);
           continue;
         }
@@ -213,6 +241,7 @@ async function githubGraphQLRequest<T>(
         lastError = error;
         if (attempt < MAX_RETRIES && isRetryableError(error.statusCode, null)) {
           const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          logRetry(error.endpoint, error.statusCode, attempt, delay, null);
           await sleep(delay);
           continue;
         }

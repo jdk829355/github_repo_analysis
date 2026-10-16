@@ -1,6 +1,7 @@
 import OpenAI, { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai';
 import { getLlmApiKey, getLlmBaseUrl, getLlmModel } from '../lib/config';
 import { LLMAPIError } from '../lib/errors';
+import { logger } from '../lib/logger';
 import { LLM_REQUEST_TIMEOUT_MS, README_MAX_SIZE_BYTES } from '../lib/constants';
 import { truncateToMaxSize } from '../lib/utils';
 import { repositoryAnalysis } from '../prompts/repository-analysis';
@@ -27,6 +28,13 @@ const RETRY_BASE_DELAY_MS = 1000;
 type ParsedOutput<T> = {
   data: T;
   rawText: string;
+};
+
+type LlmCallKind = 'repository' | 'profile';
+
+type LlmResponse = {
+  content: string;
+  finishReason: string | null;
 };
 
 function createClient(): OpenAI {
@@ -70,16 +78,37 @@ function parseJson(text: string): unknown {
   }
 }
 
-async function generateJsonResponse(prompt: string): Promise<string> {
+async function generateJsonResponse(prompt: string, kind: LlmCallKind): Promise<LlmResponse> {
+  const model = getLlmModel();
+  const startedAt = Date.now();
+
   try {
     const completion = await createClient().chat.completions.create({
-      model: getLlmModel(),
+      model,
       messages: [{ role: 'user', content: prompt }],
       temperature: TEMPERATURE,
       max_tokens: MAX_OUTPUT_TOKENS,
       response_format: { type: 'json_object' },
     });
-    return completion.choices[0]?.message?.content ?? '';
+    const choice = completion.choices[0];
+    const finishReason = choice?.finish_reason ?? null;
+
+    // 프롬프트와 응답 본문은 남기지 않는다. 비용 추적용 토큰 수만 남긴다.
+    logger.info(
+      {
+        event: 'llm.call',
+        kind,
+        model,
+        durationMs: Date.now() - startedAt,
+        finishReason,
+        promptTokens: completion.usage?.prompt_tokens,
+        completionTokens: completion.usage?.completion_tokens,
+        totalTokens: completion.usage?.total_tokens,
+      },
+      'LLM call completed'
+    );
+
+    return { content: choice?.message?.content ?? '', finishReason };
   } catch (error) {
     if (error instanceof APIError) {
       throw toLlmError(error);
@@ -90,7 +119,8 @@ async function generateJsonResponse(prompt: string): Promise<string> {
 
 async function callLlmWithRetry<T>(
   prompt: string,
-  schema: { parse: (data: unknown) => T }
+  schema: { parse: (data: unknown) => T },
+  kind: LlmCallKind
 ): Promise<ParsedOutput<T>> {
   let lastError: LLMAPIError | undefined;
 
@@ -100,7 +130,7 @@ async function callLlmWithRetry<T>(
     }
 
     // SDK가 이미 재시도한 오류이므로 여기서는 다시 시도하지 않고 그대로 던진다.
-    const rawText = await generateJsonResponse(prompt);
+    const { content: rawText, finishReason } = await generateJsonResponse(prompt, kind);
 
     try {
       const data = schema.parse(parseJson(rawText));
@@ -110,6 +140,18 @@ async function callLlmWithRetry<T>(
         error instanceof LLMAPIError
           ? error
           : new LLMAPIError('Schema validation failed', 422, rawText);
+      // finishReason이 length이면 max_tokens에 걸려 응답이 잘린 것이다.
+      logger.warn(
+        {
+          event: 'llm.invalid_response',
+          kind,
+          attempt: attempt + 1,
+          reason: lastError.message,
+          rawResponseLength: rawText.length,
+          finishReason,
+        },
+        'LLM response did not match the expected JSON'
+      );
     }
   }
 
@@ -132,7 +174,7 @@ export async function analyzeRepository(
 ): Promise<RepositoryAnalysis> {
   const normalizedInput = normalizeRepositoryInput(input);
   const prompt = repositoryAnalysis.render(normalizedInput);
-  const result = await callLlmWithRetry(prompt, RepositoryAnalysisSchema);
+  const result = await callLlmWithRetry(prompt, RepositoryAnalysisSchema, 'repository');
   return result.data;
 }
 
@@ -140,6 +182,6 @@ export async function aggregateProfile(
   input: ProfileAggregationInput
 ): Promise<ProfileReport> {
   const prompt = profileAggregation.render(input);
-  const result = await callLlmWithRetry(prompt, ProfileReportSchema);
+  const result = await callLlmWithRetry(prompt, ProfileReportSchema, 'profile');
   return result.data;
 }

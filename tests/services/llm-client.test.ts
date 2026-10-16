@@ -1,4 +1,5 @@
 import { LLM_REQUEST_TIMEOUT_MS } from '../../lib/constants';
+import { logger } from '../../lib/logger';
 import type {
   RepositoryAnalysisInput,
   ProfileAggregationInput,
@@ -28,6 +29,19 @@ const validRepositoryOutput = {
   techStack: ['Node.js'],
   leadershipSignals: [],
   confidence: 0.8,
+};
+
+const validProfileOutput = {
+  overallSummary: 'Strong backend engineer',
+  roleEstimation: {
+    primary: 'Backend',
+    secondary: ['Technical Lead'],
+    recommended: ['Senior Backend Engineer'],
+  },
+  engineeringStrengths: ['API design'],
+  collaborationPatterns: ['Code reviews'],
+  greenFlags: ['API design evidence'],
+  redFlags: ['Limited testing evidence'],
 };
 
 const repositoryInput: RepositoryAnalysisInput = {
@@ -215,6 +229,82 @@ describe('services/llm-client', () => {
         statusCode: 503,
       });
       expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('logging', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('logs each call with kind, model, finish reason and token usage', async () => {
+      const info = jest.spyOn(logger, 'info');
+      mockCreate.mockResolvedValueOnce({
+        choices: [
+          { message: { content: JSON.stringify(validRepositoryOutput) }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 1200, completion_tokens: 300, total_tokens: 1500 },
+      });
+
+      const { analyzeRepository } = await import('../../services/llm-client');
+      await analyzeRepository(repositoryInput);
+
+      expect(info).toHaveBeenCalledWith(
+        {
+          event: 'llm.call',
+          kind: 'repository',
+          model: 'test-model',
+          durationMs: expect.any(Number),
+          finishReason: 'stop',
+          promptTokens: 1200,
+          completionTokens: 300,
+          totalTokens: 1500,
+        },
+        'LLM call completed'
+      );
+    });
+
+    it('labels profile aggregation calls', async () => {
+      const info = jest.spyOn(logger, 'info');
+      mockCreate.mockResolvedValueOnce(createResponse(JSON.stringify(validProfileOutput)));
+
+      const { aggregateProfile } = await import('../../services/llm-client');
+      await aggregateProfile(profileInput);
+
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'llm.call', kind: 'profile' }),
+        'LLM call completed'
+      );
+    });
+
+    it('logs an invalid response with its length but not its content', async () => {
+      jest.useFakeTimers();
+      const warn = jest.spyOn(logger, 'warn');
+      const truncated = '{"repositoryName": "test-re';
+      mockCreate
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: truncated }, finish_reason: 'length' }],
+        })
+        .mockResolvedValueOnce(createResponse(JSON.stringify(validRepositoryOutput)));
+
+      const { analyzeRepository } = await import('../../services/llm-client');
+      const promise = analyzeRepository(repositoryInput);
+      await jest.advanceTimersByTimeAsync(1000);
+      await promise;
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        {
+          event: 'llm.invalid_response',
+          kind: 'repository',
+          attempt: 1,
+          reason: 'Malformed JSON from LLM',
+          rawResponseLength: truncated.length,
+          finishReason: 'length',
+        },
+        'LLM response did not match the expected JSON'
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(truncated);
     });
   });
 });

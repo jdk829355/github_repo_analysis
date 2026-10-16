@@ -52,9 +52,15 @@ export async function POST(request: NextRequest) {
           );
         }
         if (error.statusCode === 403) {
+          if (/rate limit/i.test(error.message)) {
+            return NextResponse.json(
+              { error: 'GitHub API rate limit exceeded' },
+              { status: 429, headers: { 'Retry-After': '60' } }
+            );
+          }
           return NextResponse.json(
-            { error: 'GitHub API rate limit exceeded' },
-            { status: 429, headers: { 'Retry-After': '60' } }
+            { error: '서버의 GitHub 토큰 권한을 확인해야 합니다.' },
+            { status: 502 }
           );
         }
       }

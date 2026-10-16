@@ -197,12 +197,11 @@ describe('services/github-client', () => {
   });
 
   describe('hasUserStarredRepository', () => {
-    it('should return true when the user is in the stargazer list', async () => {
+    const starred = (fullName: string) => ({ full_name: fullName });
+
+    it('should return true when the repository is in the user starred list', async () => {
       mockFetch.mockResolvedValueOnce(
-        createMockResponse(200, [
-          { login: 'other-user' },
-          { login: 'TestUser' },
-        ], {
+        createMockResponse(200, [starred('other/project'), starred('owner/repo')], {
           'x-ratelimit-remaining': '4999',
         })
       );
@@ -211,7 +210,7 @@ describe('services/github-client', () => {
 
       expect(result).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/stargazers?per_page=100&page=1',
+        'https://api.github.com/users/testuser/starred?per_page=100&page=1',
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer test-token',
@@ -222,25 +221,26 @@ describe('services/github-client', () => {
       );
     });
 
-    it('should return false when the user is not in the stargazer list', async () => {
+    it('should return false when the repository is not in the starred list', async () => {
       mockFetch.mockResolvedValueOnce(
-        createMockResponse(200, [{ login: 'other-user' }], {
+        createMockResponse(200, [starred('other/project')], {
           'x-ratelimit-remaining': '4999',
         })
       );
 
       await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should continue to the next stargazer page when needed', async () => {
+    it('should continue to the next starred page when needed', async () => {
       mockFetch
         .mockResolvedValueOnce(
-          createMockResponse(200, Array.from({ length: 100 }, (_, index) => ({ login: `user-${index}` })), {
+          createMockResponse(200, Array.from({ length: 100 }, (_, index) => starred(`other/repo-${index}`)), {
             'x-ratelimit-remaining': '4999',
           })
         )
         .mockResolvedValueOnce(
-          createMockResponse(200, [{ login: 'testuser' }], {
+          createMockResponse(200, [starred('owner/repo')], {
             'x-ratelimit-remaining': '4999',
           })
         );
@@ -248,9 +248,42 @@ describe('services/github-client', () => {
       await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(true);
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(mockFetch).toHaveBeenLastCalledWith(
-        'https://api.github.com/repos/owner/repo/stargazers?per_page=100&page=2',
+        'https://api.github.com/users/testuser/starred?per_page=100&page=2',
         expect.any(Object)
       );
+    });
+
+    it('should return false after the last full page when the last page is empty', async () => {
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse(200, Array.from({ length: 100 }, (_, index) => starred(`other/repo-${index}`)), {
+            'x-ratelimit-remaining': '4999',
+          })
+        )
+        .mockResolvedValueOnce(createMockResponse(200, [], { 'x-ratelimit-remaining': '4998' }));
+
+      await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should match owner/repo case-insensitively', async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(200, [starred('Owner/Repo')], {
+          'x-ratelimit-remaining': '4999',
+        })
+      );
+
+      await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(true);
+    });
+
+    it('should not treat a repository with a matching suffix or prefix as a match', async () => {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse(200, [starred('other/repo'), starred('owner/repo-fork')], {
+          'x-ratelimit-remaining': '4999',
+        })
+      );
+
+      await expect(hasUserStarredRepository('testuser', 'owner', 'repo')).resolves.toBe(false);
     });
   });
 

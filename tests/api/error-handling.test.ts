@@ -126,6 +126,40 @@ describe('POST /api/analyze error handling', () => {
     expect(data.error).toBe('GitHub API rate limit exceeded');
   });
 
+  it('returns 429 for a secondary rate limit message regardless of case', async () => {
+    mockNormalizeGitHubUrl.mockReturnValue('https://github.com/testuser');
+    mockGetUserProfile.mockResolvedValue({});
+    mockHasUserStarredRepository.mockRejectedValue(
+      new GitHubAPIError(
+        'You have exceeded a Secondary Rate Limit. Please wait.',
+        403,
+        '/users/testuser/starred'
+      )
+    );
+
+    const response = await POST(createRequest({ url: 'testuser' }) as any);
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('60');
+  });
+
+  it('returns 502 with a token permission message for non rate limit 403 errors', async () => {
+    mockNormalizeGitHubUrl.mockReturnValue('https://github.com/testuser');
+    mockGetUserProfile.mockResolvedValue({});
+    mockHasUserStarredRepository.mockRejectedValue(
+      new GitHubAPIError(
+        'Resource not accessible by personal access token',
+        403,
+        '/users/testuser/starred'
+      )
+    );
+
+    const response = await POST(createRequest({ url: 'testuser' }) as any);
+    expect(response.status).toBe(502);
+    expect(response.headers.get('Retry-After')).toBeNull();
+    const data = await response.json();
+    expect(data.error).toContain('GitHub 토큰 권한');
+  });
+
   it('returns 500 for unexpected GitHub API server errors', async () => {
     const githubUrl = 'https://github.com/testuser';
     mockNormalizeGitHubUrl.mockReturnValue(githubUrl);

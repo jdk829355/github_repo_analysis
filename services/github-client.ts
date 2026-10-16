@@ -105,23 +105,23 @@ export async function hasUserStarredRepository(
   owner: string,
   repo: string
 ): Promise<boolean> {
-  const normalizedUsername = username.toLowerCase();
+  const targetFullName = `${owner}/${repo}`.toLowerCase();
   let page = 1;
 
   while (true) {
-    const endpoint = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/stargazers?per_page=${MAX_PER_PAGE}&page=${page}`;
+    const endpoint = `/users/${encodeURIComponent(username)}/starred?per_page=${MAX_PER_PAGE}&page=${page}`;
     const data = await githubRequest(endpoint);
-    const stargazers = data as Array<{ login?: string }>;
+    const starred = data as Array<{ full_name?: string }>;
 
-    if (!Array.isArray(stargazers) || stargazers.length === 0) {
+    if (!Array.isArray(starred) || starred.length === 0) {
       return false;
     }
 
-    if (stargazers.some((stargazer) => stargazer.login?.toLowerCase() === normalizedUsername)) {
+    if (starred.some((item) => item.full_name?.toLowerCase() === targetFullName)) {
       return true;
     }
 
-    if (stargazers.length < MAX_PER_PAGE) {
+    if (starred.length < MAX_PER_PAGE) {
       return false;
     }
 

@@ -4,6 +4,7 @@ import type { RepositoryAnalysis } from '../../schemas/repository-analysis';
 import { filterCommits as defaultFilterCommits } from '../../lib/commit-filter';
 import { truncateToMaxSize as defaultTruncateToMaxSize } from '../../lib/utils';
 import { README_MAX_SIZE_BYTES } from '../../lib/constants';
+import { logger } from '../../lib/logger';
 import type { RepositoryAnalysisInput } from '../../prompts/types';
 import type { GitHubAPIError } from '../../lib/errors';
 import * as githubClient from '../github-client';
@@ -159,6 +160,9 @@ export async function analyzeRepositoryPipeline(
     throw new Error('Prisma client is required for repository analysis pipeline');
   }
 
+  const startedAt = Date.now();
+  const repoLogger = logger.child({ jobId, repo: repoName });
+
   try {
     await deps.publishEvent(jobId, {
       type: 'repo_analysis_started',
@@ -199,6 +203,10 @@ export async function analyzeRepositoryPipeline(
         repo: repoName,
         reason: 'insufficient commits',
       });
+      repoLogger.info(
+        { event: 'repo.skipped', reason: 'insufficient commits', commitCount: commits.length },
+        'repository analysis skipped'
+      );
       return { status: 'SKIPPED', reason: 'insufficient commits' };
     }
 
@@ -250,8 +258,17 @@ export async function analyzeRepositoryPipeline(
       summary: validated.summary,
     });
 
+    repoLogger.info(
+      { event: 'repo.completed', durationMs: Date.now() - startedAt, commitCount: commitLogs.length },
+      'repository analysis completed'
+    );
     return { status: 'COMPLETED', analysis: validated };
   } catch (error) {
+    // 저장소 하나가 실패해도 작업은 계속되므로 warn으로 남긴다.
+    repoLogger.warn(
+      { event: 'repo.failed', durationMs: Date.now() - startedAt, err: error },
+      'repository analysis failed'
+    );
     const message = error instanceof Error ? error.message : 'Unknown error';
     await deps.publishEvent(jobId, {
       type: 'repo_analysis_failed',

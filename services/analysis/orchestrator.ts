@@ -3,6 +3,7 @@ import { ANALYSIS_TIMEOUT_MS } from '../../lib/constants';
 import { AnalysisError } from '../../lib/errors';
 import { truncateToMaxSize } from '../../lib/utils';
 import { filterCommits } from '../../lib/commit-filter';
+import { logger } from '../../lib/logger';
 import { prisma } from '../../lib/prisma';
 import * as cache from '../cache';
 import { setJobRepoList } from '../cache';
@@ -87,6 +88,13 @@ export async function runAnalysisPipeline(
   githubUrl: string,
   jobId: string
 ): Promise<void> {
+  const startedAt = Date.now();
+  const jobLogger = logger.child({ jobId });
+  const repoCounts = { total: 0, reused: 0, completed: 0, skipped: 0, failed: 0 };
+  let profileReused = false;
+
+  jobLogger.info({ event: 'job.started', username }, 'analysis job started');
+
   try {
     await prisma.analysis_jobs.update({
       where: { id: jobId },
@@ -101,6 +109,7 @@ export async function runAnalysisPipeline(
 
     const { repositories } = await githubClient.getUserPinnedRepositories(username);
     const currentFingerprint = buildProfileFingerprint(repositories);
+    repoCounts.total = repositories.length;
 
     if (repositories.length === 0) {
       // repo가 없는 경우
@@ -223,6 +232,7 @@ export async function runAnalysisPipeline(
           repo: repo.name,
           summary: previous.analysis.summary,
         });
+        repoCounts.reused++;
       } else {
         reposToAnalyze.push(repo);
       }
@@ -232,7 +242,7 @@ export async function runAnalysisPipeline(
 
     const analysisWork = async () => {
       for (const repo of reposToAnalyze) {
-        await analyzeRepositoryPipeline(
+        const result = await analyzeRepositoryPipeline(
           {
             jobId,
             analysisJobId: jobId,
@@ -242,9 +252,17 @@ export async function runAnalysisPipeline(
           },
           deps
         );
+        if (result.status === 'COMPLETED') {
+          repoCounts.completed++;
+        } else if (result.status === 'SKIPPED') {
+          repoCounts.skipped++;
+        } else {
+          repoCounts.failed++;
+        }
       }
 
       if (canReuseProfileReport && previousProfileReport) {
+        profileReused = true;
         const widgetSvgs = renderWidgetSvgVariants({
           githubUsername: username,
           overallSummary: previousProfileReport.overall_summary,
@@ -311,6 +329,10 @@ export async function runAnalysisPipeline(
       where: { id: jobId },
       data: { status: 'COMPLETED', completed_at: new Date() },
     });
+    jobLogger.info(
+      { event: 'job.completed', durationMs: Date.now() - startedAt, repos: repoCounts, profileReused },
+      'analysis job completed'
+    );
     await cache.releaseJobActive(githubUrl, jobId);
     await publishEvent(jobId, {
       type: 'stateChange',
@@ -323,6 +345,11 @@ export async function runAnalysisPipeline(
       jobId,
     });
   } catch (error) {
+    // 아래 정리 작업이 실패하면 원래 에러가 가려지므로 먼저 남긴다.
+    jobLogger.error(
+      { event: 'job.failed', durationMs: Date.now() - startedAt, repos: repoCounts, err: error },
+      'analysis job failed'
+    );
     await prisma.analysis_jobs.update({
       where: { id: jobId },
       data: {

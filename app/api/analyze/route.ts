@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
-import { normalizeGitHubUrl } from '../../../lib/utils';
+import { parseJsonBody } from '../../../lib/parse-json-body';
 import { GitHubAPIError } from '../../../lib/errors';
+import { GitHubUrlRequestSchema } from '../../../schemas/github-url-request';
 import {
   VERIFICATION_REPO_NAME,
   VERIFICATION_REPO_OWNER,
@@ -13,43 +14,12 @@ import { analysisQueue } from '../../../workers/analysis-worker';
 
 export async function POST(request: NextRequest) {
   try {
-    let body: unknown;
-
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
+    const parsed = await parseJsonBody(request, GitHubUrlRequestSchema);
+    if (!parsed.ok) {
+      return parsed.response;
     }
 
-    if (!body || typeof body !== 'object') {
-      return NextResponse.json(
-        { error: 'Invalid request body' },
-        { status: 400 }
-      );
-    }
-
-    const { url } = body as Record<string, unknown>;
-
-    if (!url || typeof url !== 'string') {
-      return NextResponse.json(
-        { error: 'URL is required' },
-        { status: 400 }
-      );
-    }
-
-    let normalizedUrl: string;
-
-    try {
-      normalizedUrl = normalizeGitHubUrl(url);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Invalid URL';
-      return NextResponse.json({ error: message }, { status: 400 });
-    }
-
+    const normalizedUrl = parsed.data.url;
     const username = new URL(normalizedUrl).pathname.slice(1);
 
     try {

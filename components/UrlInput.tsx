@@ -83,17 +83,6 @@ export default function UrlInput() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/verify-star", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "star 검증에 실패했습니다");
-      }
-
       await startAnalysis();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");

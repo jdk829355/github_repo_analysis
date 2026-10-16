@@ -241,7 +241,9 @@ describe('services/analysis/repo-analysis', () => {
       expect.objectContaining({
         type: 'repo_analysis_failed',
         repo: 'sample-repo',
+        error: '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       })
     );
+    expect(JSON.stringify(mockPublishEvent.mock.calls)).not.toContain('LLM failed');
   });
 });

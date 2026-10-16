@@ -29,7 +29,7 @@
 | O-1 | 헬스체크 엔드포인트, 재시작 정책, 로그 로테이션 | 완료 `a62d1df` |
 | O-2 | pino 로거, 워커·작업 생명주기 로그 | 완료 `01a7aca` |
 | O-3 | GitHub·LLM 클라이언트 로그 | 완료 `b1f9198` |
-| O-4 | API 500 처리와 사용자에게 보이는 내부 에러 정리 | 대기 |
+| O-4 | API 500 처리와 사용자에게 보이는 내부 에러 정리 | 완료 |
 | O-5 | Alloy로 Grafana Cloud에 로그 보내기 | 대기 (사용자: Grafana Cloud 계정) |
 | O-6 | 인프라 메트릭 수집 | 대기 |
 | O-7 | 업타임 체크 등록 | 대기 (사용자) |
@@ -82,13 +82,23 @@
 
 ## O-4. API 500 처리와 사용자에게 보이는 내부 에러 정리
 
-지금은 내부 에러 메시지가 사용자 화면까지 간다.
+내부 에러 메시지가 사용자 화면까지 가던 곳이 네 군데였다.
 
-- [analyze/route.ts](../../app/api/analyze/route.ts), [verify-star/route.ts](../../app/api/verify-star/route.ts): 500 응답에 `error.message`를 그대로 넣는다. DB 호스트나 `REDIS_URL environment variable is not set` 같은 내용이 보일 수 있다.
-- [orchestrator.ts](../../services/analysis/orchestrator.ts): 원본 에러 메시지를 SSE로 보내고 `error_message`에 저장한다. [events/route.ts](../../app/api/analysis/[jobId]/events/route.ts)가 그 값을 다시 보낸다.
-- [profile-aggregation.ts](../../services/analysis/profile-aggregation.ts): LLM 원본 응답 500자를 에러 메시지에 붙인다. 이 값이 진행 화면에 그대로 나온다.
+- [analyze/route.ts](../../app/api/analyze/route.ts), [verify-star/route.ts](../../app/api/verify-star/route.ts): 500 응답에 `error.message`를 그대로 넣었고 서버 로그는 남기지 않았다. DB 호스트나 `REDIS_URL environment variable is not set` 같은 내용이 보일 수 있었다.
+- [orchestrator.ts](../../services/analysis/orchestrator.ts): 원본 에러 메시지를 SSE로 보내고 `error_message`에 저장했다. [events/route.ts](../../app/api/analysis/[jobId]/events/route.ts)가 그 값을 다시 보낸다.
+- [profile-aggregation.ts](../../services/analysis/profile-aggregation.ts): LLM 원본 응답 500자를 에러 메시지에 붙여 `aggregation_failed`로 보냈다. 화면은 이 이벤트를 처리하지 않지만 브라우저 네트워크 탭에서는 보였다.
+- [repo-analysis.ts](../../services/analysis/repo-analysis.ts): 저장소 하나가 실패하면 원본 메시지를 `repo_analysis_failed`로 보냈고 진행 화면에 `실패: …`로 나왔다.
 
-고치는 방향: 상세 내용은 서버 로그에만 남기고 사용자에게는 정해진 문구를 보낸다. 라우트의 500은 `api.error` 이벤트로 남긴다. GitHub 토큰 권한 문제(502)는 운영자가 고쳐야 하므로 error로 남긴다. `error_message` 컬럼에 무엇을 저장할지(사용자용 문구인지 상세 내용인지)는 작업 전에 정한다.
+바꾼 것:
+
+- [lib/errors.ts](../../lib/errors.ts)의 `toUserMessage`가 에러를 정해진 문구로 바꾼다. 고정된 저장소 없음, 분석할 저장소 없음, 타임아웃, GitHub rate limit만 따로 안내하고 나머지는 모두 "분석 중 오류가 발생했습니다"로 보낸다. 앞의 셋은 `AnalysisError`의 메시지 문자열로 구분하므로, 던지는 쪽 메시지를 바꾸면 이 함수도 함께 고쳐야 한다.
+- `error_message` 컬럼에는 사용자용 문구를 저장한다. 상세 원인은 `jobId`로 `job.failed` 로그에서 찾는다. 스키마와 SSE 라우트는 그대로 둔다.
+- 라우트의 500과 GitHub 토큰 권한 문제(502)는 `api.error`(error)로 남긴다. 필드는 `route`, `status`, `err`다. 사용자에게는 정해진 문구만 보낸다.
+
+남은 것:
+
+- 이미 DB에 저장된 실패 작업의 `error_message`에는 원본 메시지가 그대로 있고 SSE 스냅샷이 그 값을 보낸다. 필요하면 UPDATE 한 번으로 지운다.
+- O-5 전까지 상세 원인은 서버의 Docker 로그(10MB × 3개)에만 있어서 로테이션되면 사라진다.
 
 ## O-5. Alloy로 Grafana Cloud에 로그 보내기
 

@@ -40,7 +40,7 @@ jest.mock('@prisma/client', () => ({
 }));
 
 import { POST } from '../../app/api/analyze/route';
-import { GitHubAPIError } from '../../lib/errors';
+import { GitHubAPIError, INTERNAL_ERROR_MESSAGE } from '../../lib/errors';
 
 describe('POST /api/analyze error handling', () => {
   beforeEach(() => {
@@ -171,7 +171,7 @@ describe('POST /api/analyze error handling', () => {
     const response = await POST(request as any);
     expect(response.status).toBe(500);
     const data = await response.json();
-    expect(data.error).toBe('Internal Server Error');
+    expect(data.error).toBe(INTERNAL_ERROR_MESSAGE);
   });
 
   it('returns 500 for unhandled errors during processing', async () => {
@@ -185,7 +185,7 @@ describe('POST /api/analyze error handling', () => {
     const response = await POST(request as any);
     expect(response.status).toBe(500);
     const data = await response.json();
-    expect(data.error).toBe('Database connection failed');
+    expect(data.error).toBe(INTERNAL_ERROR_MESSAGE);
   });
 
   it('returns 403 when the profile has not starred the verification repository', async () => {

@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { ProfileReportSchema, type ProfileReport } from '../../schemas/profile-report';
 import { RoleSchema } from '../../prompts/types';
 import type { ProfileAggregationInput, RepositoryAnalysis } from '../../prompts/types';
-import { AnalysisError } from '../../lib/errors';
+import { AnalysisError, toUserMessage } from '../../lib/errors';
 import { aggregateProfile as aggregateWithLlm } from '../llm-client';
 import { renderWidgetSvgVariants } from '../widget-export';
 
@@ -144,18 +144,16 @@ export async function aggregateProfile(
 
     return validated;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'aggregation_failed';
-    const rawResponse = error instanceof Error && 'rawResponse' in error ? String(error.rawResponse) : undefined;
-    const fullError = rawResponse ? `${errorMessage} | RAW: ${rawResponse.substring(0, 500)}` : errorMessage;
+    const userMessage = toUserMessage(error);
 
     await prisma.analysis_jobs.update({
       where: { id: input.jobId },
-      data: { status: 'FAILED', error_message: fullError },
+      data: { status: 'FAILED', error_message: userMessage },
     });
 
     await publishEvent(input.jobId, {
       type: 'aggregation_failed',
-      error: fullError,
+      error: userMessage,
     });
     throw error;
   }

@@ -40,6 +40,8 @@ jest.mock('@prisma/client', () => ({
 }));
 
 import { POST } from '../../app/api/analyze/route';
+import { INTERNAL_ERROR_MESSAGE } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 
 describe('POST /api/analyze', () => {
   beforeEach(() => {
@@ -239,10 +241,15 @@ describe('POST /api/analyze', () => {
     mockNormalizeGitHubUrl.mockReturnValue(githubUrl);
     mockGetUserProfile.mockResolvedValue({ login: 'testuser' });
     mockAnalysisQueueAdd.mockRejectedValueOnce(new Error('queue down'));
+    const loggerError = jest.spyOn(logger, 'error');
 
     const failed = await POST(createRequest({ url: 'testuser' }) as any);
     expect(failed.status).toBe(500);
-    expect((await failed.json()).error).toBe('queue down');
+    expect((await failed.json()).error).toBe(INTERNAL_ERROR_MESSAGE);
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'api.error', route: '/api/analyze', status: 500 }),
+      'API request failed'
+    );
     const failedJobId = mockAcquireJobActive.mock.calls[0][1];
     expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, failedJobId);
 

@@ -538,7 +538,7 @@ describe('services/analysis/orchestrator', () => {
             where: { id: jobId },
             data: {
               status: 'FAILED',
-              error_message: 'No pinned repositories found',
+              error_message: '고정(pinned)된 저장소가 없어 분석할 수 없습니다.',
             },
           },
         ],
@@ -555,7 +555,7 @@ describe('services/analysis/orchestrator', () => {
             type: 'stateChange',
             state: 'FAILED',
             jobId,
-            error: 'No pinned repositories found',
+            error: '고정(pinned)된 저장소가 없어 분석할 수 없습니다.',
           },
         ],
       ]);
@@ -586,7 +586,7 @@ describe('services/analysis/orchestrator', () => {
         where: { id: jobId },
         data: {
           status: 'FAILED',
-          error_message: `Analysis timed out after ${ANALYSIS_TIMEOUT_MS}ms`,
+          error_message: '분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.',
         },
       });
     });
@@ -693,9 +693,11 @@ describe('services/analysis/orchestrator', () => {
 
       await expect(startAnalysis(username, githubUrl)).rejects.toThrow('LLM failed');
 
+      // 원본 메시지 대신 정해진 문구를 저장하고 보낸다.
+      const userMessage = '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       expect(mockAnalysisJobsUpdate).toHaveBeenLastCalledWith({
         where: { id: jobId },
-        data: { status: 'FAILED', error_message: 'LLM failed' },
+        data: { status: 'FAILED', error_message: userMessage },
       });
       expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
       expect(mockPublishEvent).toHaveBeenCalledWith(
@@ -704,15 +706,16 @@ describe('services/analysis/orchestrator', () => {
           type: 'stateChange',
           state: 'FAILED',
           jobId,
-          error: 'LLM failed',
+          error: userMessage,
         })
       );
       expect(mockPublishEvent).toHaveBeenCalledWith(jobId, {
         type: 'job_failed',
         state: 'FAILED',
         jobId,
-        error: 'LLM failed',
+        error: userMessage,
       });
+      expect(JSON.stringify(mockPublishEvent.mock.calls)).not.toContain('LLM failed');
     });
 
     it('marks FAILED and clears active on aggregation error', async () => {
@@ -735,7 +738,10 @@ describe('services/analysis/orchestrator', () => {
 
       expect(mockAnalysisJobsUpdate).toHaveBeenLastCalledWith({
         where: { id: jobId },
-        data: { status: 'FAILED', error_message: 'Aggregation failed' },
+        data: {
+          status: 'FAILED',
+          error_message: '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        },
       });
       expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
     });

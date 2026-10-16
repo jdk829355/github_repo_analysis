@@ -12,7 +12,8 @@ jest.mock('../../services/github-client', () => ({
 }));
 
 import { POST } from '../../app/api/verify-star/route';
-import { GitHubAPIError } from '../../lib/errors';
+import { GitHubAPIError, INTERNAL_ERROR_MESSAGE } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 
 describe('POST /api/verify-star', () => {
   beforeEach(() => {
@@ -93,10 +94,32 @@ describe('POST /api/verify-star', () => {
       )
     );
 
+    const loggerError = jest.spyOn(logger, 'error');
+
     const response = await POST(createRequest({ url: 'testuser' }) as any);
     expect(response.status).toBe(502);
     expect(response.headers.get('Retry-After')).toBeNull();
     const data = await response.json();
     expect(data.error).toContain('GitHub 토큰 권한');
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'api.error', route: '/api/verify-star', status: 502 }),
+      'GitHub token is missing a required permission'
+    );
+  });
+
+  it('returns a fixed message on unexpected errors and logs the original', async () => {
+    const original = new Error('REDIS_URL environment variable is not set');
+    mockGetUserProfile.mockRejectedValue(original);
+    const loggerError = jest.spyOn(logger, 'error');
+
+    const response = await POST(createRequest({ url: 'testuser' }) as any);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe(INTERNAL_ERROR_MESSAGE);
+    expect(JSON.stringify(data)).not.toContain('REDIS_URL');
+    expect(loggerError).toHaveBeenCalledWith(
+      { event: 'api.error', route: '/api/verify-star', status: 500, err: original },
+      'API request failed'
+    );
   });
 });

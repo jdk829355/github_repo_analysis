@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
 import { parseJsonBody } from '../../../lib/parse-json-body';
-import { GitHubAPIError } from '../../../lib/errors';
+import { GitHubAPIError, INTERNAL_ERROR_MESSAGE } from '../../../lib/errors';
+import { logger } from '../../../lib/logger';
 import { GitHubUrlRequestSchema } from '../../../schemas/github-url-request';
 import {
   VERIFICATION_REPO_NAME,
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest) {
               { status: 429, headers: { 'Retry-After': '60' } }
             );
           }
+          // 운영자가 토큰을 고쳐야 하는 문제라 error로 남긴다.
+          logger.error(
+            { event: 'api.error', route: '/api/analyze', status: 502, err: error },
+            'GitHub token is missing a required permission'
+          );
           return NextResponse.json(
             { error: '서버의 GitHub 토큰 권한을 확인해야 합니다.' },
             { status: 502 }
@@ -120,8 +126,10 @@ export async function POST(request: NextRequest) {
       { status: 202 }
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error(
+      { event: 'api.error', route: '/api/analyze', status: 500, err: error },
+      'API request failed'
+    );
+    return NextResponse.json({ error: INTERNAL_ERROR_MESSAGE }, { status: 500 });
   }
 }

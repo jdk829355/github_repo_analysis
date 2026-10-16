@@ -6,7 +6,7 @@ import { truncateToMaxSize as defaultTruncateToMaxSize } from '../../lib/utils';
 import { README_MAX_SIZE_BYTES } from '../../lib/constants';
 import { logger } from '../../lib/logger';
 import type { RepositoryAnalysisInput } from '../../prompts/types';
-import type { GitHubAPIError } from '../../lib/errors';
+import { toUserMessage, type GitHubAPIError } from '../../lib/errors';
 import * as githubClient from '../github-client';
 import * as llmClient from '../llm-client';
 
@@ -273,7 +273,7 @@ export async function analyzeRepositoryPipeline(
     await deps.publishEvent(jobId, {
       type: 'repo_analysis_failed',
       repo: repoName,
-      error: message,
+      error: toUserMessage(error),
     });
     return { status: 'FAILED', error: message };
   }

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ANALYSIS_TIMEOUT_MS } from '../../lib/constants';
-import { AnalysisError } from '../../lib/errors';
+import { AnalysisError, toUserMessage } from '../../lib/errors';
 import { truncateToMaxSize } from '../../lib/utils';
 import { filterCommits } from '../../lib/commit-filter';
 import { logger } from '../../lib/logger';
@@ -356,26 +356,26 @@ export async function runAnalysisPipeline(
       { event: 'job.failed', durationMs: Date.now() - startedAt, repos: repoCounts, err: error },
       'analysis job failed'
     );
+    const userMessage = toUserMessage(error);
     await prisma.analysis_jobs.update({
       where: { id: jobId },
       data: {
         status: 'FAILED',
-        error_message: error instanceof Error ? error.message : 'Unknown error',
+        error_message: userMessage,
       },
     });
     await cache.releaseJobActive(githubUrl, jobId);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await publishEvent(jobId, {
       type: 'stateChange',
       state: 'FAILED',
       jobId,
-      error: errorMessage,
+      error: userMessage,
     });
     await publishEvent(jobId, {
       type: 'job_failed',
       state: 'FAILED',
       jobId,
-      error: errorMessage,
+      error: userMessage,
     });
     throw error;
   }

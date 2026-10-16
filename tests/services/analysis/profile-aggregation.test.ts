@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { AnalysisError } from '../../../lib/errors';
+import { AnalysisError, LLMAPIError } from '../../../lib/errors';
 import { ProfileReportSchema } from '../../../schemas/profile-report';
 
 const mockRepositoriesFindMany = jest.fn();
@@ -175,13 +175,35 @@ describe('services/analysis/profile-aggregation', () => {
     ).rejects.toThrow('LLM failed');
     expect(mockAnalysisJobsUpdate).toHaveBeenCalledWith({
       where: { id: 'job-1' },
-      data: { status: 'FAILED', error_message: 'LLM failed' },
+      data: {
+        status: 'FAILED',
+        error_message: '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      },
     });
     expect(mockProfileReportsCreate).not.toHaveBeenCalled();
     expect(mockProfileReportsUpdate).not.toHaveBeenCalled();
     expect(mockPublishEvent).toHaveBeenCalledWith('job-1', {
       type: 'aggregation_failed',
-      error: 'LLM failed',
+      error: '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
     });
+  });
+
+  it('does not expose the raw LLM response when aggregation fails', async () => {
+    mockRepositoriesFindMany.mockResolvedValue([{ id: 'repo-1' }]);
+    mockRepositoryAnalysesFindMany.mockResolvedValue([
+      createRepoAnalysis({ summary: 'Repo summary' }),
+    ]);
+    mockAggregateProfile.mockRejectedValue(
+      new LLMAPIError('Schema validation failed', 422, '{"overallSummary": "raw-llm-output')
+    );
+
+    const { aggregateProfile } = await import('../../../services/analysis/profile-aggregation');
+
+    await expect(
+      aggregateProfile({ username: 'testuser', jobId: 'job-1' }, createDeps())
+    ).rejects.toThrow('Schema validation failed');
+    const sent = JSON.stringify([mockAnalysisJobsUpdate.mock.calls, mockPublishEvent.mock.calls]);
+    expect(sent).not.toContain('raw-llm-output');
+    expect(sent).not.toContain('Schema validation failed');
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
 import { parseJsonBody } from '../../../lib/parse-json-body';
@@ -9,7 +10,7 @@ import {
   VERIFICATION_REPO_URL,
 } from '../../../lib/constants';
 import { getUserProfile, hasUserStarredRepository } from '../../../services/github-client';
-import { checkJobDeduplication, clearJobActive, setJobActive } from '../../../services/cache';
+import { acquireJobActive, checkJobDeduplication, releaseJobActive } from '../../../services/cache';
 import { analysisQueue } from '../../../lib/queue';
 
 export async function POST(request: NextRequest) {
@@ -56,36 +57,57 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    const existingJobId = await checkJobDeduplication(normalizedUrl);
-    if (existingJobId) {
-      const job = await prisma.analysis_jobs.findUnique({
-        where: { id: existingJobId },
-      });
+    const jobId = randomUUID();
 
-      if (job?.status === 'PENDING' || job?.status === 'PROCESSING') {
-        return NextResponse.json(
-          { jobId: job.id, status: job.status },
-          { status: 200 }
-        );
+    if (!(await acquireJobActive(normalizedUrl, jobId))) {
+      const existingJobId = await checkJobDeduplication(normalizedUrl);
+      if (existingJobId) {
+        const existingJob = await prisma.analysis_jobs.findUnique({
+          where: { id: existingJobId },
+        });
+
+        // 키를 잡은 요청이 아직 DB 행을 만들기 전이면 existingJob이 null이다.
+        if (!existingJob || existingJob.status === 'PENDING' || existingJob.status === 'PROCESSING') {
+          return NextResponse.json(
+            { jobId: existingJobId, status: existingJob?.status ?? 'PENDING' },
+            { status: 200 }
+          );
+        }
+
+        await releaseJobActive(normalizedUrl, existingJobId);
       }
 
-      await clearJobActive(normalizedUrl);
+      if (!(await acquireJobActive(normalizedUrl, jobId))) {
+        const winnerJobId = await checkJobDeduplication(normalizedUrl);
+        if (winnerJobId) {
+          return NextResponse.json(
+            { jobId: winnerJobId, status: 'PENDING' },
+            { status: 200 }
+          );
+        }
+        throw new Error('Failed to acquire analysis job lock');
+      }
     }
 
-    const job = await prisma.analysis_jobs.create({
-      data: {
-        github_profile: normalizedUrl,
-        status: 'PENDING',
-      },
-    });
+    let job;
+    try {
+      job = await prisma.analysis_jobs.create({
+        data: {
+          id: jobId,
+          github_profile: normalizedUrl,
+          status: 'PENDING',
+        },
+      });
 
-    await setJobActive(normalizedUrl, job.id);
-
-    await analysisQueue.add(
-      'analyze',
-      { username, githubUrl: normalizedUrl },
-      { jobId: job.id }
-    );
+      await analysisQueue.add(
+        'analyze',
+        { username, githubUrl: normalizedUrl },
+        { jobId }
+      );
+    } catch (error) {
+      await releaseJobActive(normalizedUrl, jobId);
+      throw error;
+    }
 
     return NextResponse.json(
       { jobId: job.id, status: job.status },

@@ -44,10 +44,26 @@ export async function setJobActive(githubUrl: string, valueOrTtl?: string | numb
   await client.set(CACHE_KEYS.activeJob(hash), value, 'EX', finalTtl);
 }
 
-export async function clearJobActive(githubUrl: string): Promise<void> {
+// 키가 없을 때만 jobId를 저장한다. 성공한 요청만 true를 받는다.
+export async function acquireJobActive(githubUrl: string, jobId: string): Promise<boolean> {
   const client = getRedisClient();
   const hash = hashUrl(githubUrl);
-  await client.del(CACHE_KEYS.activeJob(hash));
+  const result = await client.set(CACHE_KEYS.activeJob(hash), jobId, 'EX', TTL.job, 'NX');
+  return result === 'OK';
+}
+
+// 값이 내 jobId일 때만 지운다. 다른 작업이 덮어쓴 키는 건드리지 않는다.
+const RELEASE_JOB_ACTIVE_SCRIPT = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+end
+return 0
+`;
+
+export async function releaseJobActive(githubUrl: string, jobId: string): Promise<void> {
+  const client = getRedisClient();
+  const hash = hashUrl(githubUrl);
+  await client.eval(RELEASE_JOB_ACTIVE_SCRIPT, 1, CACHE_KEYS.activeJob(hash), jobId);
 }
 
 export async function setJobRepoList(jobId: string, repos: string[]): Promise<void> {

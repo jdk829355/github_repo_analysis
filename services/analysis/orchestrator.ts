@@ -306,7 +306,7 @@ export async function runAnalysisPipeline(
       where: { id: jobId },
       data: { status: 'COMPLETED', completed_at: new Date() },
     });
-    await cache.clearJobActive(githubUrl);
+    await cache.releaseJobActive(githubUrl, jobId);
     await publishEvent(jobId, {
       type: 'stateChange',
       state: 'COMPLETED',
@@ -325,7 +325,7 @@ export async function runAnalysisPipeline(
         error_message: error instanceof Error ? error.message : 'Unknown error',
       },
     });
-    await cache.clearJobActive(githubUrl);
+    await cache.releaseJobActive(githubUrl, jobId);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await publishEvent(jobId, {
       type: 'stateChange',

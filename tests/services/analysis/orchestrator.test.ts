@@ -37,12 +37,12 @@ jest.mock('@prisma/client', () => {
 
 const mockCheckJobDeduplication = jest.fn();
 const mockSetJobActive = jest.fn();
-const mockClearJobActive = jest.fn();
+const mockReleaseJobActive = jest.fn();
 
 jest.mock('../../../services/cache', () => ({
   checkJobDeduplication: mockCheckJobDeduplication,
   setJobActive: mockSetJobActive,
-  clearJobActive: mockClearJobActive,
+  releaseJobActive: mockReleaseJobActive,
   setJobRepoList: jest.fn().mockResolvedValue(undefined),
   getJobRepoList: jest.fn().mockResolvedValue(null),
 }));
@@ -192,7 +192,7 @@ describe('services/analysis/orchestrator', () => {
         jobId,
         expect.objectContaining({ type: 'job_complete', state: 'COMPLETED', jobId })
       );
-      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+      expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
     });
 
     it('reuses cached analyses for still-pinned repos and deletes stale cached repos', async () => {
@@ -543,8 +543,8 @@ describe('services/analysis/orchestrator', () => {
           },
         ],
       ]);
-      expect(mockClearJobActive).toHaveBeenCalledTimes(1);
-      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+      expect(mockReleaseJobActive).toHaveBeenCalledTimes(1);
+      expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
       const failedEvents = mockPublishEvent.mock.calls.filter(
         ([, event]) => event.type === 'stateChange' && event.state === 'FAILED'
       );
@@ -581,7 +581,7 @@ describe('services/analysis/orchestrator', () => {
         `Analysis timed out after ${ANALYSIS_TIMEOUT_MS}ms`
       );
 
-      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+      expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
       expect(mockAnalysisJobsUpdate).toHaveBeenLastCalledWith({
         where: { id: jobId },
         data: {
@@ -611,7 +611,7 @@ describe('services/analysis/orchestrator', () => {
         where: { id: jobId },
         data: { status: 'FAILED', error_message: 'LLM failed' },
       });
-      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+      expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
       expect(mockPublishEvent).toHaveBeenCalledWith(
         jobId,
         expect.objectContaining({
@@ -651,7 +651,7 @@ describe('services/analysis/orchestrator', () => {
         where: { id: jobId },
         data: { status: 'FAILED', error_message: 'Aggregation failed' },
       });
-      expect(mockClearJobActive).toHaveBeenCalledWith(githubUrl);
+      expect(mockReleaseJobActive).toHaveBeenCalledWith(githubUrl, jobId);
     });
   });
 });

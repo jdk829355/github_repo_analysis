@@ -7,6 +7,7 @@ const mockRedis = {
   get: jest.fn(),
   set: jest.fn(),
   del: jest.fn(),
+  eval: jest.fn(),
 };
 
 jest.mock('ioredis', () => {
@@ -75,12 +76,48 @@ describe('services/cache', () => {
     });
   });
 
-  it('clears active job marker', async () => {
-    const { clearJobActive } = await import('../../services/cache');
+  describe('acquireJobActive', () => {
+    it('sets the key with NX and returns true when acquired', async () => {
+      const { acquireJobActive } = await import('../../services/cache');
+      mockRedis.set.mockResolvedValueOnce('OK');
 
-    await clearJobActive('https://github.com/testuser');
+      const result = await acquireJobActive('https://github.com/testuser', 'job-123');
 
-    expect(mockRedis.del).toHaveBeenCalledWith('job:hash_https://github.com/testuser');
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'job:hash_https://github.com/testuser',
+        'job-123',
+        'EX',
+        TTL.job,
+        'NX'
+      );
+      expect(result).toBe(true);
+    });
+
+    it('returns false when the key already exists', async () => {
+      const { acquireJobActive } = await import('../../services/cache');
+      mockRedis.set.mockResolvedValueOnce(null);
+
+      const result = await acquireJobActive('https://github.com/testuser', 'job-456');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('releaseJobActive', () => {
+    it('runs a compare-and-delete script with the key and jobId', async () => {
+      const { releaseJobActive } = await import('../../services/cache');
+      mockRedis.eval.mockResolvedValueOnce(1);
+
+      await releaseJobActive('https://github.com/testuser', 'job-123');
+
+      expect(mockRedis.eval).toHaveBeenCalledWith(
+        expect.stringMatching(/get.*KEYS\[1\].*==.*ARGV\[1\][\s\S]*del.*KEYS\[1\]/),
+        1,
+        'job:hash_https://github.com/testuser',
+        'job-123'
+      );
+      expect(mockRedis.del).not.toHaveBeenCalled();
+    });
   });
 
   it('stores and reads job repo list', async () => {

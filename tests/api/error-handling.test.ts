@@ -1,6 +1,7 @@
 const mockNormalizeGitHubUrl = jest.fn();
 const mockCheckJobDeduplication = jest.fn();
-const mockSetJobActive = jest.fn();
+const mockAcquireJobActive = jest.fn();
+const mockReleaseJobActive = jest.fn();
 const mockAnalysisQueueAdd = jest.fn();
 const mockGetUserProfile = jest.fn();
 const mockHasUserStarredRepository = jest.fn();
@@ -16,7 +17,8 @@ jest.mock('../../services/github-client', () => ({
 
 jest.mock('../../services/cache', () => ({
   checkJobDeduplication: mockCheckJobDeduplication,
-  setJobActive: mockSetJobActive,
+  acquireJobActive: mockAcquireJobActive,
+  releaseJobActive: mockReleaseJobActive,
 }));
 
 jest.mock('../../lib/queue', () => ({
@@ -44,6 +46,14 @@ describe('POST /api/analyze error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockHasUserStarredRepository.mockResolvedValue(true);
+    mockAcquireJobActive.mockReset().mockResolvedValue(true);
+    mockCheckJobDeduplication.mockReset().mockResolvedValue(null);
+    mockAnalysisJobsCreate
+      .mockReset()
+      .mockImplementation(async ({ data }: { data: { id: string } }) => ({
+        id: data.id,
+        status: 'PENDING',
+      }));
   });
 
   function createRequest(body: unknown): Request {
@@ -134,6 +144,7 @@ describe('POST /api/analyze error handling', () => {
     const githubUrl = 'https://github.com/testuser';
     mockNormalizeGitHubUrl.mockReturnValue(githubUrl);
     mockGetUserProfile.mockResolvedValue({});
+    mockAcquireJobActive.mockResolvedValue(false);
     mockCheckJobDeduplication.mockRejectedValue(new Error('Database connection failed'));
 
     const request = createRequest({ url: 'testuser' });
@@ -161,6 +172,7 @@ describe('POST /api/analyze error handling', () => {
     const githubUrl = 'https://github.com/testuser';
     mockNormalizeGitHubUrl.mockReturnValue(githubUrl);
     mockGetUserProfile.mockResolvedValue({ login: 'testuser' });
+    mockAcquireJobActive.mockResolvedValue(false);
     mockCheckJobDeduplication.mockResolvedValue('existing-job-123');
     mockAnalysisJobsFindUnique.mockResolvedValue({
       id: 'existing-job-123',
@@ -179,22 +191,17 @@ describe('POST /api/analyze error handling', () => {
     const githubUrl = 'https://github.com/testuser';
     mockNormalizeGitHubUrl.mockReturnValue(githubUrl);
     mockGetUserProfile.mockResolvedValue({ login: 'testuser' });
-    mockCheckJobDeduplication.mockResolvedValue(null);
-    mockAnalysisJobsCreate.mockResolvedValue({
-      id: 'new-job-456',
-      status: 'PENDING',
-    });
 
     const request = createRequest({ url: 'testuser' });
     const response = await POST(request as any);
     expect(response.status).toBe(202);
     const data = await response.json();
-    expect(data).toEqual({ jobId: 'new-job-456', status: 'PENDING' });
-    expect(mockSetJobActive).toHaveBeenCalledWith(githubUrl, 'new-job-456');
+    expect(data.status).toBe('PENDING');
+    expect(mockAcquireJobActive).toHaveBeenCalledWith(githubUrl, data.jobId);
     expect(mockAnalysisQueueAdd).toHaveBeenCalledWith(
       'analyze',
       { username: 'testuser', githubUrl: 'https://github.com/testuser' },
-      { jobId: 'new-job-456' }
+      { jobId: data.jobId }
     );
   });
 });

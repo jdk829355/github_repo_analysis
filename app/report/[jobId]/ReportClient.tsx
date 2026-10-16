@@ -11,8 +11,6 @@ interface RoleEstimation {
 
 interface ProfileReport {
   overallSummary: string;
-  techStack?: string[];
-  mainContributionAreas?: string[];
   repositories?: Array<{
     name: string;
     description: string;
@@ -308,31 +306,6 @@ function ReportContent({ report, jobId }: { report: ProfileReport; jobId: string
         <FlagList title="Green Flags" items={greenFlags} tone="green" />
         <FlagList title="Red Flags" items={redFlags} tone="red" />
       </div>
-
-      {report.techStack && report.techStack.length > 0 && (
-        <SectionCard title="기술 스택 분석">
-          <div className="flex flex-wrap gap-2">
-            {report.techStack.map((tech, index) => (
-              <span
-                key={index}
-                className="rounded-full bg-[#e0e2eb] px-4 py-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#414753]"
-              >
-                {tech}
-              </span>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
-      {report.mainContributionAreas && report.mainContributionAreas.length > 0 && (
-        <SectionCard title="주요 기여 분야">
-          <ul className="space-y-2">
-            {report.mainContributionAreas.map((area, index) => (
-              <ListItem key={index} item={area} />
-            ))}
-          </ul>
-        </SectionCard>
-      )}
 
       {repos.length > 0 && (
         <SectionCard title="Pin된 저장소">

@@ -30,7 +30,7 @@ export async function GET(
     collaborationPatterns: report.collaboration_patterns,
     greenFlags: report.green_flags || [],
     redFlags: report.red_flags || [],
-    repositories: (job.repositories || []).map((r: any) => ({
+    repositories: (job.repositories || []).map((r) => ({
       name: r.name,
       description: r.description || '',
       language: r.primary_language || '',

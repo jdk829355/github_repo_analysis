@@ -1,4 +1,6 @@
+import type { profile_reports, repositories } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { ProfileReportSchema } from '../../../schemas/profile-report';
 import ReportClient from './ReportClient';
 
 interface RoleEstimation {
@@ -7,16 +9,16 @@ interface RoleEstimation {
   recommended: string[];
 }
 
+interface ReportRepository {
+  name: string;
+  description: string;
+  language: string;
+  stars: number;
+}
+
 interface ProfileReport {
   overallSummary: string;
-  techStack?: string[];
-  mainContributionAreas?: string[];
-  repositories?: Array<{
-    name: string;
-    description: string;
-    language: string;
-    stars: number;
-  }>;
+  repositories: ReportRepository[];
   roleEstimation: RoleEstimation;
   engineeringStrengths: string[];
   collaborationPatterns: string[];
@@ -24,39 +26,23 @@ interface ProfileReport {
   redFlags: string[];
 }
 
-interface PrismaProfileReport {
-  overall_summary: string;
-  tech_stack?: string[];
-  main_contribution_areas?: string[];
-  repositories?: Array<{
-    name: string;
-    description: string;
-    primary_language: string;
-    stars: number;
-  }>;
-  role_estimation: RoleEstimation;
-  engineering_strengths: string[];
-  collaboration_patterns: string[];
-  green_flags?: string[];
-  red_flags?: string[];
-}
-
-function normalizeReport(data: PrismaProfileReport): ProfileReport {
+function normalizeReport(
+  data: profile_reports,
+  repositories: repositories[]
+): ProfileReport {
   return {
     overallSummary: data.overall_summary,
-    techStack: data.tech_stack,
-    mainContributionAreas: data.main_contribution_areas,
-    repositories: (data.repositories || []).map((r) => ({
+    repositories: repositories.map((r) => ({
       name: r.name,
       description: r.description || '',
       language: r.primary_language || '',
       stars: r.stars,
     })),
-    roleEstimation: data.role_estimation,
+    roleEstimation: ProfileReportSchema.shape.roleEstimation.parse(data.role_estimation),
     engineeringStrengths: data.engineering_strengths,
     collaborationPatterns: data.collaboration_patterns,
-    greenFlags: data.green_flags || [],
-    redFlags: data.red_flags || [],
+    greenFlags: data.green_flags,
+    redFlags: data.red_flags,
   };
 }
 
@@ -74,14 +60,7 @@ async function getReport(jobId: string) {
   });
 
   if (!job?.profile_report || job.status !== 'COMPLETED') return null;
-  const report = normalizeReport(job.profile_report as unknown as PrismaProfileReport);
-  report.repositories = (job.repositories || []).map((r: any) => ({
-    name: r.name,
-    description: r.description || '',
-    language: r.primary_language || '',
-    stars: r.stars,
-  }));
-  return report;
+  return normalizeReport(job.profile_report, job.repositories);
 }
 
 export default async function ReportPage({ params }: PageProps) {

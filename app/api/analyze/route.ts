@@ -10,7 +10,7 @@ import {
 } from '../../../lib/constants';
 import { getUserProfile, hasUserStarredRepository } from '../../../services/github-client';
 import { checkJobDeduplication, clearJobActive, setJobActive } from '../../../services/cache';
-import { analysisQueue } from '../../../workers/analysis-worker';
+import { analysisQueue } from '../../../lib/queue';
 
 export async function POST(request: NextRequest) {
   try {

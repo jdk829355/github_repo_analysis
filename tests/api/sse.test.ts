@@ -6,7 +6,7 @@ jest.mock('../../services/cache', () => ({
   getJobRepoList: jest.fn().mockResolvedValue(null),
 }));
 
-jest.mock('../../workers/analysis-worker', () => ({
+jest.mock('../../lib/queue', () => ({
   getJobState: jest.fn(),
   getEventChannel: jest.fn(),
   publishEvent: jest.fn(),
@@ -17,7 +17,7 @@ jest.mock('../../workers/analysis-worker', () => ({
 }));
 
 import { GET } from '../../app/api/analysis/[jobId]/events/route';
-import { getJobState, getEventChannel } from '../../workers/analysis-worker';
+import { getJobState, getEventChannel } from '../../lib/queue';
 import Redis from 'ioredis';
 
 describe('GET /api/analysis/[jobId]/events', () => {

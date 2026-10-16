@@ -39,7 +39,7 @@ export type AggregationDeps = {
 const DEFAULT_DEPS: Omit<AggregationDeps, 'prisma'> = {
   llmClient: { aggregateProfile: aggregateWithLlm },
   publishEvent: async (jobId, event) => {
-    const worker = await import('../../workers/analysis-worker');
+    const worker = await import('../../lib/queue');
     return worker.publishEvent(jobId, event);
   },
 };

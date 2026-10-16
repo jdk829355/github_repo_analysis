@@ -69,7 +69,7 @@ jest.mock('../../../services/analysis/profile-aggregation', () => ({
 
 const mockPublishEvent = jest.fn();
 
-jest.mock('../../../workers/analysis-worker', () => ({
+jest.mock('../../../lib/queue', () => ({
   publishEvent: mockPublishEvent,
 }));
 

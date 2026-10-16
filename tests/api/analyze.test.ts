@@ -21,7 +21,7 @@ jest.mock('../../services/cache', () => ({
   setJobActive: mockSetJobActive,
 }));
 
-jest.mock('../../workers/analysis-worker', () => ({
+jest.mock('../../lib/queue', () => ({
   analysisQueue: {
     add: mockAnalysisQueueAdd,
   },

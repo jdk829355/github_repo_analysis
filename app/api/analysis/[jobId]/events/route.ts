@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { getRedisUrl } from '../../../../../lib/config';
 import { prisma } from '../../../../../lib/prisma';
 import { getJobRepoList } from '../../../../../services/cache';
-import { getJobState, getEventChannel } from '../../../../../workers/analysis-worker';
+import { getJobState, getEventChannel } from '../../../../../lib/queue';
 
 const TERMINAL_EVENTS = [
   'job_complete',

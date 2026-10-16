@@ -110,7 +110,7 @@ function createDefaultDeps(): RepoAnalysisDeps {
     githubClient,
     llmClient,
     publishEvent: async (jobId: string, event: Record<string, unknown>) => {
-      const worker = await import('../../workers/analysis-worker');
+      const worker = await import('../../lib/queue');
       return worker.publishEvent(jobId, event);
     },
     prisma: null,

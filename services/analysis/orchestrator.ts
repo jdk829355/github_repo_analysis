@@ -12,7 +12,7 @@ import * as llmClient from '../llm-client';
 import { renderWidgetSvgVariants } from '../widget-export';
 import { analyzeRepositoryPipeline, type RepoAnalysisDeps } from './repo-analysis';
 import { aggregateProfile } from './profile-aggregation';
-import { publishEvent } from '../../workers/analysis-worker';
+import { publishEvent } from '../../lib/queue';
 
 type CachedRepository = {
   id: string;

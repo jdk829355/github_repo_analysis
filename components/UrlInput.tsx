@@ -49,7 +49,8 @@ export default function UrlInput() {
     return username;
   };
 
-  const startAnalysis = async () => {
+  // star가 없으면 서버가 403으로 응답한다(토큰 권한 문제는 502라 섞이지 않는다).
+  const startAnalysis = async (): Promise<"started" | "star-required"> => {
     const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,24 +59,19 @@ export default function UrlInput() {
 
     const data = await response.json();
 
+    if (response.status === 403) {
+      return "star-required";
+    }
+
     if (!response.ok) {
       throw new Error(data.error || "분석 시작에 실패했습니다");
     }
 
     router.push(`/analysis/${data.jobId}`);
+    return "started";
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const username = validateUrl();
-    if (!username) return;
-
-    setPendingUsername(username);
-    setStep("confirm");
-  };
-
-  const handleVerifyAndAnalyze = async () => {
+  const analyze = async () => {
     const username = validateUrl();
     if (!username) return;
 
@@ -83,12 +79,24 @@ export default function UrlInput() {
     setIsLoading(true);
 
     try {
-      await startAnalysis();
+      const result = await startAnalysis();
+      if (result === "star-required") {
+        // 확인 UI가 이미 떠 있는데 또 403이면 star가 아직 안 된 것이다.
+        if (step === "confirm") {
+          setError("아직 star가 확인되지 않았습니다. star를 남긴 뒤 다시 시도해주세요.");
+        }
+        setStep("confirm");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    analyze();
   };
 
   return (
@@ -160,7 +168,7 @@ export default function UrlInput() {
             </div>
             <button
               type="button"
-              onClick={handleVerifyAndAnalyze}
+              onClick={analyze}
               disabled={isLoading}
               className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#181c22] px-5 py-3 text-xs font-semibold uppercase tracking-[0.5px] text-white transition-colors hover:bg-[#2f3540] focus:outline-none focus:ring-2 focus:ring-[#181c22] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >

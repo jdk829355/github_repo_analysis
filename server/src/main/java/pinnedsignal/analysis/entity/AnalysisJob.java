@@ -58,4 +58,14 @@ public class AnalysisJob {
         job.status = AnalysisJobStatus.PENDING;
         return job;
     }
+
+    public void markCompleted(Instant completedAt) {
+        this.status = AnalysisJobStatus.COMPLETED;
+        this.completedAt = completedAt;
+    }
+
+    public void markFailed(String errorMessage) {
+        this.status = AnalysisJobStatus.FAILED;
+        this.errorMessage = errorMessage;
+    }
 }

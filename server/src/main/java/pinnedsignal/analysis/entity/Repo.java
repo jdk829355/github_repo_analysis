@@ -91,4 +91,22 @@ public class Repo {
         this.status = status;
         this.position = position;
     }
+
+    public void markAnalyzing() {
+        this.status = RepoStatus.ANALYZING;
+    }
+
+    public void markCompleted(String summary) {
+        this.status = RepoStatus.COMPLETED;
+        this.description = summary;
+    }
+
+    public void markSkipped() {
+        this.status = RepoStatus.SKIPPED;
+    }
+
+    public void markFailed(String errorMessage) {
+        this.status = RepoStatus.FAILED;
+        this.errorMessage = errorMessage;
+    }
 }

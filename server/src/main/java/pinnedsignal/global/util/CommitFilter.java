@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  */
 public final class CommitFilter {
 
-    private static final String S = "[\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]";
+    private static final String S = TextUtils.JS_WHITESPACE;
 
     private static Pattern regex(String pattern) {
         return Pattern.compile(pattern.replace("\\s", S), Pattern.CASE_INSENSITIVE);

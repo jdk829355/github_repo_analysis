@@ -443,6 +443,30 @@ class GitHubClientTest {
     }
 
     @Test
+    void interruptAbortsRequestWaitingForResponse() throws Exception {
+        // GitHub 요청에는 타임아웃이 없다. 분석 제한 시간이 지나면 인터럽트로 끊을 수 있어야 한다(S-4).
+        wireMock.stubFor(get("/users/slow").willReturn(json(200, "{}").withFixedDelay(30_000)));
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread caller = new Thread(() -> {
+            try {
+                client.getUserProfile("slow");
+            } catch (Throwable e) {
+                failure.set(e);
+            }
+        });
+
+        caller.start();
+        Thread.sleep(500);
+        long interruptedAt = System.nanoTime();
+        caller.interrupt();
+        caller.join(5_000);
+
+        assertThat(caller.isAlive()).isFalse();
+        assertThat(failure.get()).isNotNull();
+        assertThat(System.nanoTime() - interruptedAt).isLessThan(java.util.concurrent.TimeUnit.SECONDS.toNanos(5));
+    }
+
+    @Test
     void keepsFieldsForLogging() {
         assertThat(new GitHubApiException("x", 404, "/users/x").logFields())
                 .isEqualTo(Map.of("statusCode", 404, "endpoint", "/users/x"));

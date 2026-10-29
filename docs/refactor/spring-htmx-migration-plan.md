@@ -113,7 +113,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 
 - **이유**: polling 화면은 "총 N개 중 몇 개 완료, 지금 분석 중인 저장소, 건너뜀·실패한 저장소"를 DB만 보고 그려야 한다. 지금은 분석을 마친 저장소만 행이 생기고([repo-analysis.ts:220](../../services/analysis/repo-analysis.ts)), 건너뜀·실패는 이벤트로만 알려 저장되지 않는다. 그래서 지금도 새로고침하면 건너뜀·실패 표시가 사라진다.
 - **변경**: pinned 저장소 목록을 받은 직후 모든 저장소를 `status=PENDING`, `position=순서`로 넣는다. 필요한 GitHub 메타데이터는 pinned 목록에 이미 있다(재사용 경로가 이미 이 값으로 행을 만든다, [orchestrator.ts:203](../../services/analysis/orchestrator.ts)). 분석을 시작하면 `ANALYZING`, 끝나면 `COMPLETED`/`SKIPPED`/`FAILED`로 바꾸고 실패 문구는 `error_message`에 남긴다.
-- 0단계 문서에서 미뤄 둔 "일부 저장소 실패가 기록 없이 빠진 채 COMPLETED 처리됨" 문제도 여기서 기록은 남게 된다.
+- 여기서는 "일부 저장소 실패가 기록 없이 빠진 채 COMPLETED 처리됨" 문제도 기록은 남는다.
 - **동작 변화 주의 (Q4)**: 리포트 재사용 판단에 쓰는 지문 `buildProfileFingerprint(previousJob.repositories)`([orchestrator.ts:150](../../services/analysis/orchestrator.ts))는 지금 "분석을 마친 저장소"만으로 만들어진다. 저장소 행을 전부 남기면 건너뛴 저장소까지 지문에 들어가 재사용 조건이 달라진다. 지금과 같게 하려면 이전 작업의 저장소를 `status = COMPLETED`로 걸러서 지문을 만든다. 저장소별 이전 분석 재사용(`previousAnalyses`)은 분석 행이 있는지 이미 확인하므로 그대로 둔다.
 
 - **확인**: Testcontainers Postgres에서 V1 → V2가 적용되고, 엔티티로 읽고 쓸 때 배열·JSON·enum이 왕복된다.
@@ -128,7 +128,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
   - Spring AI는 쓰지 않는다. 추상화가 한 겹 늘고, OpenAI 호환 업체마다 다른 동작을 맞추기가 오히려 어렵다.
 - **프롬프트** ([prompts/](../../prompts)): 템플릿 문자열을 `resources/prompts/*.txt`로 옮기고 값만 끼워 넣는다. 문구가 바뀌면 응답 품질이 달라지므로 한 글자도 바꾸지 않는다.
 - **응답 검증** (zod → Java): [schemas/](../../schemas)의 세 스키마를 record와 Bean Validation 어노테이션으로 옮긴다. Jackson은 모르는 필드를 무시하게 한다(zod 기본 동작과 같음). 검증에 실패하면 지금처럼 재시도하거나 오류를 던진다.
-- **커밋 필터** ([lib/commit-filter.ts](../../lib/commit-filter.ts)): Java 정규식으로 옮긴다. `\b` 동작이 JS와 같은지 0-8 테스트 사례로 확인한다.
+- **커밋 필터** ([lib/commit-filter.ts](../../lib/commit-filter.ts)): Java 정규식으로 옮긴다. `\b` 동작이 JS와 같은지 [tests/lib/commit-filter.test.ts](../../tests/lib/commit-filter.test.ts)의 사례로 확인한다.
 - **에러 문구** ([lib/errors.ts](../../lib/errors.ts)의 `toUserMessage`): 사용자에게 보이는 문구를 그대로 옮긴다. 내부 에러 메시지는 화면에 보내지 않는다(O-4).
 - **확인**: WireMock으로 GitHub·LLM 응답을 흉내 내 재시도, 오류 분류, JSON 검증 실패를 테스트한다.
 
@@ -149,7 +149,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
   RETURNING id, github_profile;
   ```
 - 집은 작업은 크기 3짜리 스레드풀(`MAX_CONCURRENT_ANALYSIS`)에서 실행한다. 지금의 BullMQ 워커 동시성 3과 같다.
-- 재시도는 하지 않는다. 지금도 `attempts: 1`이다(0-4).
+- 재시도는 하지 않는다. 지금도 `attempts: 1`이다.
 - **재시작 복구**: 앱이 뜰 때 `PROCESSING`인 작업을 `FAILED`("서버 재시작으로 분석이 중단되었습니다")로 바꾼다. 서버 한 대 가정이라서 가능한 방식이다. 지금은 워커가 죽으면 DB에 `PROCESSING`이 남고 Redis 락이 1시간 동안 같은 프로필을 막는데 이 문제도 사라진다.
 - 배포할 때 진행 중이던 분석은 실패로 끝나므로 사용자는 다시 요청하면 된다. 이게 문제가 되면 graceful shutdown과 `stop_grace_period`를 늘리는 방법을 따로 검토한다.
 
@@ -171,7 +171,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
   | `repo_analysis_started` / `completed` / `skipped` / `failed` | `repositories.status`, `error_message` |
   | `aggregation_complete` | 저장소가 모두 끝났고 작업이 `PROCESSING`이면 화면이 "프로필 종합 중"으로 표시 |
 
-- **타임아웃** (10분, `ANALYSIS_TIMEOUT_MS`): 작업을 `Future`로 돌리고 `get(timeout)`이 넘으면 취소 플래그를 세운다. 저장소 루프가 매 반복마다 플래그를 확인한다. 지금의 `timedOut` 변수와 같은 방식이다. 0단계에서 미뤄 둔 "타임아웃 뒤에도 작업이 계속 실행됨" 문제는 `Future.cancel(true)`의 인터럽트로 블로킹 HTTP 호출까지 끊을 수 있는지 함께 확인한다.
+- **타임아웃** (10분, `ANALYSIS_TIMEOUT_MS`): 작업을 `Future`로 돌리고 `get(timeout)`이 넘으면 취소 플래그를 세운다. 저장소 루프가 매 반복마다 플래그를 확인한다. 지금의 `timedOut` 변수와 같은 방식이다. "타임아웃 뒤에도 작업이 계속 실행됨" 문제는 `Future.cancel(true)`의 인터럽트로 블로킹 HTTP 호출까지 끊을 수 있는지 함께 확인한다.
 - **위젯 SVG** ([services/widget-export.ts](../../services/widget-export.ts)): Java text block으로 옮긴다. XML 이스케이프, 줄바꿈 길이, 최대 줄 수 규칙을 그대로 둔다. 기존 저장값과 새로 만든 SVG를 바이트 단위로 비교하는 테스트를 둔다.
 - **확인**: Testcontainers Postgres와 가짜 GitHub·LLM 클라이언트로 정상, 재사용, 저장소 일부 실패, 전체 실패, 타임아웃, 재시작 복구를 테스트한다. 같은 프로필 작업이 동시에 두 개 실행되지 않는지도 확인한다.
 
@@ -195,7 +195,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 
 - 지금 [UrlInput.tsx](../../components/UrlInput.tsx)는 입력 → 검증 → star 안내 → 다시 검증을 React state로 관리한다. HTMX에서는 서버가 단계별 조각을 돌려준다.
 - `POST /analyze`의 처리 순서는 [analyze/route.ts](../../app/api/analyze/route.ts)와 같다: URL 검증 → 프로필 존재 확인 → star 확인 → 작업 생성.
-- **중복 방지**: `INSERT` 하나로 끝난다. partial unique index에 걸리면(같은 프로필이 진행 중) 그 작업 id를 조회해 그쪽 진행 화면으로 보낸다. jobId 선생성, `SET NX`, Lua 해제, 큐 등록 실패 시 락 해제 같은 0-6의 처리가 필요 없어진다. 큐 등록이 곧 `PENDING` 행 `INSERT`라서 둘이 어긋날 수 없다.
+- **중복 방지**: `INSERT` 하나로 끝난다. partial unique index에 걸리면(같은 프로필이 진행 중) 그 작업 id를 조회해 그쪽 진행 화면으로 보낸다. jobId 선생성, `SET NX`, Lua 해제, 큐 등록 실패 시 락 해제 같은 처리가 필요 없어진다. 큐 등록이 곧 `PENDING` 행 `INSERT`라서 둘이 어긋날 수 없다.
 - **응답**:
   - 성공: `HX-Redirect: /analysis/{jobId}`
   - star 없음: star 안내와 "다시 검증" 버튼 조각
@@ -214,7 +214,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 
 ### 리포트 화면
 
-- [ReportClient.tsx](../../app/report/[jobId]/ReportClient.tsx)를 Thymeleaf 템플릿으로 옮긴다. `job.status !== COMPLETED`이면 404 처리(0-7)를 유지한다.
+- [ReportClient.tsx](../../app/report/[jobId]/ReportClient.tsx)를 Thymeleaf 템플릿으로 옮긴다. `job.status !== COMPLETED`이면 404 처리를 유지한다.
 - 상호작용은 작은 바닐라 JS 파일 하나로 처리한다. Alpine.js는 넣지 않는다.
   - 위젯 코드 모달: 네이티브 `<dialog>`
   - 강점 "더 보기": `<details>` 또는 클래스 토글
@@ -282,7 +282,7 @@ S-0에서 기존 테스트를 보고 채운다. 아래는 코드에서 확인한
 - [ ] `full_name`과 `updated_at`이 같은 저장소는 이전 분석을 재사용한다
 - [ ] 현재 pinned 목록에 없는 이전 저장소 행은 삭제한다
 - [ ] 지문이 같고 green/red flag가 있으면 프로필 리포트를 재사용한다
-- [ ] 프로필 종합이 실패하면 대체 리포트를 저장하지 않는다(0-7)
+- [ ] 프로필 종합이 실패하면 대체 리포트를 저장하지 않는다
 - [ ] 10분 타임아웃이면 `FAILED`이고 그 뒤 단계로 넘어가지 않는다
 - [ ] 동시에 실행되는 분석은 최대 3개
 - [ ] 재시작 시 `PROCESSING` 작업이 `FAILED`가 된다 (새 동작)
@@ -293,7 +293,7 @@ S-0에서 기존 테스트를 보고 채운다. 아래는 코드에서 확인한
 - [ ] 진행 조각: 새로고침해도 같은 내용, 완료 시 리포트로 이동, 실패 시 286과 실패 문구
 
 **클라이언트 로직**
-- [ ] 커밋 필터의 통과·제외 사례(0-8)
+- [ ] 커밋 필터의 통과·제외 사례(`tests/lib/commit-filter.test.ts`)
 - [ ] LLM 응답 JSON 검증 실패, 재시도, 타임아웃
 - [ ] GitHub 호출 재시도와 오류 분류
 - [ ] 로그에 토큰·API 키가 남지 않는다

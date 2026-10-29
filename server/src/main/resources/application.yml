@@ -10,6 +10,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      # 컬럼은 timestamp(3)(시간대 없음)이고 Prisma가 UTC로 넣었다. Instant를 그 형식 그대로 UTC로 읽고 쓴다.
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+      hibernate.jdbc.time_zone: UTC
   flyway:
     schemas: pinnedsignal
     # 운영 DB에는 이미 V1 스키마가 있으므로 V1을 건너뛴다. 빈 DB(로컬, Testcontainers)에서는 V1부터 실행한다.

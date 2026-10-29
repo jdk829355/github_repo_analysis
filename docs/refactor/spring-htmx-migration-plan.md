@@ -53,6 +53,7 @@ src/main/java/{base}/
     controller/      메인 화면, POST /analyze, 진행 화면과 progress 조각
     dto/request/
     dto/response/
+    exception/       StarRequiredException
     entity/          AnalysisJob, Repo, RepoAnalysis
     enums/           AnalysisJobStatus, RepoStatus
     repository/      AnalysisJobRepository, RepoRepository, RepoAnalysisRepository
@@ -103,7 +104,7 @@ src/test/resources/
 | S-2 | DB 계층과 스키마 변경 | 1.5일 | 완료 `c2e9652` |
 | S-3 | GitHub·LLM 클라이언트, 프롬프트, 응답 검증 | 2~3일 | 완료 `d1cbb7a` |
 | S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 완료 `9a60ec2` |
-| S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 대기 |
+| S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 완료 `ae03a82` |
 | S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 대기 |
 | S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 대기 |
 | S-8 | Node 코드 제거, 문서 갱신 | 0.5일 | 대기 |
@@ -318,6 +319,20 @@ src/test/resources/
 - `app/error.tsx`, `app/not-found.tsx`, `app/analysis/[jobId]/error.tsx`를 `templates/error/404.html`, `5xx.html`로 옮긴다.
 
 - **확인**: MockMvc로 각 엔드포인트의 상태 코드, `HX-Redirect`, 286, 조각 내용을 테스트한다. 브라우저에서 메인 → star 안내 → 진행 → 리포트 → 위젯 복사까지 한 번 직접 확인한다.
+- **결과** (`ae03a82`)
+  - 엔드포인트는 위 표대로 만들었다. 분석 요청은 `AnalyzeController`, 진행 화면은 `AnalysisProgressController`, 리포트와 위젯은 `report` 도메인 컨트롤러가 맡는다. 화면이 읽는 쪽은 `AnalysisQueryService`로 두어 상태를 쓰는 `AnalysisProgressService`와 나눴다. `report`는 `analysis`의 Repository를 직접 부르지 않고 이 서비스를 거친다.
+  - 오류 조각은 `htmx-config`의 `responseHandling`으로 4xx·5xx도 화면에 넣게 해서 상태 코드(400, 403, 404, 429, 502, 500)를 그대로 보낸다. 다만 polling 요소는 `hx-on::before-swap`으로 5xx 응답을 무시하고 다음 주기에 다시 요청한다. DB가 잠깐 끊겨도 진행 화면이 오류 페이지로 바뀌지 않는다.
+  - 중복 방지는 `INSERT`가 partial unique index에 걸리면 진행 중인 작업을 조회하는 방식이다. 같은 프로필을 동시에 두 번 요청하는 테스트로 작업이 하나만 생기는 것을 확인했다.
+  - star 안내의 "검증 후 분석" 버튼과 실패 화면의 "다시 시도" 버튼은 프로필 URL을 hidden 입력으로 들고 `/analyze`를 다시 부른다. 그래서 "다시 시도"는 6단계(수동 재시도)를 기다리지 않고 새 `PENDING` 작업을 만든다. 안내를 보고 다시 눌렀는데 또 star가 없으면 `confirm=true` 파라미터를 보고 "아직 star가 확인되지 않았습니다" 문구를 더한다.
+  - 입력 검증 문구는 Node 클라이언트 화면에 있던 "GitHub 프로필 URL을 입력해주세요", "올바른 GitHub 프로필 URL을 입력해주세요"를 쓴다. 정규화는 `GitHubUrls`로 옮겼고 `tests/lib/utils.test.ts`의 사례를 포함한다. 프로필 없음, rate limit, 토큰 권한(502, `api.error` 로그), 내부 오류는 Node 앱과 같은 문구다.
+  - 진행 화면의 첫 응답과 polling 응답은 같은 조각 템플릿이다. 건너뛴 저장소에는 "분석할 커밋이 없어 건너뛰었습니다."를 보여준다. 이미 끝난 작업의 `/analysis/{jobId}`는 리포트로 302 이동하고 조각 요청은 `HX-Redirect`를 보낸다.
+  - 리포트의 "Pin된 저장소" 카드에는 분석이 끝난(`COMPLETED`) 저장소만 나온다. 지금 화면과 같다. 위젯 대화상자는 네이티브 `<dialog>`이고 강점 더 보기·테마 전환·복사는 `report.js` 하나가 맡는다.
+  - 위젯은 저장된 SVG가 현재 버전(`inner-card-v4`)이면 그대로 쓰고 아니면 다시 만들어 저장한다. 경로, `theme` 파라미터, `Cache-Control`은 같다. `Content-Type`은 Tomcat이 `;` 뒤 공백을 지워서 `image/svg+xml;charset=utf-8`로 나간다. 미디어 타입은 같아서 그대로 뒀다.
+  - `/api/health`는 DB 쿼리와 폴러의 마지막 poll 시각(60초 안)을 본다. 확인마다 3초 제한이 있고 하나라도 실패하면 503이다. 폴러는 큐가 비어 있어도 매 주기에 시각을 갱신한다.
+  - 오류 화면은 `GlobalExceptionHandler`가 `error/404`, `error/5xx`로 보낸다. 400이나 405 같은 요청 오류는 Spring이 원래 상태 코드로 처리하도록 넘긴다. 5xx 화면의 "Try Again" 버튼은 새로고침 대신 메인 화면 링크로 바꿨다. `favicon.ico`는 `app/`에서 `static/`으로 복사했다.
+  - 계획과 달라진 점: `analysis/exception/`(`StarRequiredException`)을 디렉터리 구조에 더했다.
+  - **브라우저 확인**: 가짜 GitHub·LLM 서버와 Postgres 컨테이너에 앱을 붙여 메인 → star 안내 → "아직 star가 확인되지 않았습니다" → star 후 재검증 → 진행(polling) → 리포트 자동 이동 → 위젯 대화상자(테마 전환, 미리보기, 복사)까지 확인했다. 이 과정에서 "검증 후 분석" 버튼의 로딩 표시가 안 보이는 문제를 찾아 고쳤다.
+  - 테스트는 293개이고 모두 통과한다. 컨트롤러는 MockMvc 슬라이스 테스트로, 서비스는 Testcontainers로 확인했고 `AnalysisWebFlowTest`가 요청 → 큐 → 진행 → 리포트 → 위젯을 실제 컨텍스트에서 한 번에 훑는다.
 
 ## S-6. 테스트
 
@@ -360,13 +375,13 @@ src/test/resources/
 S-0에서 기존 테스트를 보고 채운다. 아래는 코드에서 확인한 항목이고, 빠진 것을 더한다.
 
 **분석 요청**
-- [ ] 잘못된 URL은 400, 없는 프로필은 404, star가 없으면 403과 안내 문구
-- [ ] GitHub rate limit은 429와 `Retry-After: 60`, 토큰 권한 문제는 502와 정해진 문구
-- [ ] 같은 프로필을 동시에 두 번 요청하면 작업은 하나만 생기고 둘 다 같은 jobId를 받는다
-- [ ] 끝난 작업이 있는 프로필을 다시 요청하면 새 작업이 생긴다
-- [ ] 내부 오류는 정해진 문구만 보내고 상세는 로그로 남긴다
-- [ ] GitHub 5xx는 500과 정해진 문구, 대소문자와 상관없이 "rate limit"이 들어간 메시지(보조 한도 포함)는 429
-- [ ] 큐 등록이나 DB 저장이 실패하면 다음 요청이 새 작업을 만들 수 있다 (DB 큐에서는 `INSERT` 하나라서 자연히 지켜진다)
+- [x] 잘못된 URL은 400, 없는 프로필은 404, star가 없으면 403과 안내 문구
+- [x] GitHub rate limit은 429와 `Retry-After: 60`, 토큰 권한 문제는 502와 정해진 문구
+- [x] 같은 프로필을 동시에 두 번 요청하면 작업은 하나만 생기고 둘 다 같은 jobId를 받는다
+- [x] 끝난 작업이 있는 프로필을 다시 요청하면 새 작업이 생긴다
+- [x] 내부 오류는 정해진 문구만 보내고 상세는 로그로 남긴다
+- [x] GitHub 5xx는 500과 정해진 문구, 대소문자와 상관없이 "rate limit"이 들어간 메시지(보조 한도 포함)는 429
+- [x] 큐 등록이나 DB 저장이 실패하면 다음 요청이 새 작업을 만들 수 있다 (DB 큐에서는 `INSERT` 하나라서 자연히 지켜진다)
 
 **파이프라인**
 - [x] pinned 저장소 0개면 `FAILED`, 실패 처리는 한 번만
@@ -387,10 +402,10 @@ S-0에서 기존 테스트를 보고 채운다. 아래는 코드에서 확인한
 - [x] 위젯 SVG는 표시 크기만 줄이고 원래 좌표계를 유지한다
 
 **조회**
-- [ ] `COMPLETED`가 아닌 작업의 리포트와 위젯은 404
-- [ ] 위젯은 저장된 SVG를 우선 쓰고, 없으면 만들어서 돌려준다. `theme` 파라미터와 `Cache-Control: public, max-age=300, stale-while-revalidate=86400` 유지
-- [ ] 진행 조각: 새로고침해도 같은 내용, 완료 시 리포트로 이동, 실패 시 286과 실패 문구
-- [ ] `/api/health`는 DB가 응답하지 않거나 확인 하나가 제한 시간을 넘기면 503
+- [x] `COMPLETED`가 아닌 작업의 리포트와 위젯은 404
+- [x] 위젯은 저장된 SVG를 우선 쓰고, 없으면 만들어서 돌려준다. `theme` 파라미터와 `Cache-Control: public, max-age=300, stale-while-revalidate=86400` 유지
+- [x] 진행 조각: 새로고침해도 같은 내용, 완료 시 리포트로 이동, 실패 시 286과 실패 문구
+- [x] `/api/health`는 DB가 응답하지 않거나 확인 하나가 제한 시간을 넘기면 503
 
 **클라이언트 로직**
 - [x] 커밋 필터의 통과·제외 사례(`tests/lib/commit-filter.test.ts`)

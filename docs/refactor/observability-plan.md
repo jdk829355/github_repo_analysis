@@ -21,7 +21,6 @@
 ## 진행 방식
 
 - `main` 체크아웃에서 작업한다. `main`에 push하면 배포 워크플로가 테스트 → 이미지 빌드 → 배포 순서로 돈다.
-- 커밋 규칙: 작업 하나당 커밋 하나. 커밋 메시지 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - 확인 기준: 커밋마다 `npx jest`, `npx tsc --noEmit -p tsconfig.json`, `npx tsc --noEmit -p tsconfig.worker.json`을 실행한다. 기준선은 300개 전부 통과다(`af48034` 기준).
 
 | # | 작업 | 상태 |

@@ -16,7 +16,6 @@
 ## 진행 상태
 
 - 브랜치: `fix/simple-bugs` (main에서 분기, push 안 함)
-- 커밋 규칙: 작업 하나당 커밋 하나. 커밋 메시지 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - 확인 기준: 커밋마다 `npx jest` 실행. 기준선은 API 테스트 28개 통과, `tests/api/sse.test.ts` 3개 실패(기존 실패, 5단계에서 SSE와 함께 삭제 예정). 이보다 나빠지면 안 된다.
 
 | # | 작업 | 상태 |

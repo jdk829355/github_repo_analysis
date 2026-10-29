@@ -13,7 +13,6 @@
 ## 진행 방식
 
 - 브랜치: `refactor/step4-llm-endpoint` (main에서 분기)
-- 커밋 규칙: 작업 하나당 커밋 하나.
 - 확인 기준: 커밋마다 `npx jest` 실행. 기준선은 251개 중 244개 통과, 7개 실패다. 실패 7개는 모두 이번 작업 전부터 있었다.
   - `tests/infrastructure/setup.test.ts` 4개: `.env.example` 없음(`.gitignore`의 `.env*`에 걸림), `docker` 디렉터리 없음, `next build`
   - `tests/api/sse.test.ts` 3개: 5단계에서 SSE와 함께 삭제 예정

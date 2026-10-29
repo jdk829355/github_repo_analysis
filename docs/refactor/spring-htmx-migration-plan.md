@@ -37,7 +37,6 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 
 ## 진행 방식
 
-- 커밋 규칙: 작업 하나당 커밋 하나. 커밋 메시지 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - 확인 기준: 기존 Node 쪽은 지금 기준선(Jest 300개 전부 통과)을 유지한다. Spring 쪽은 커밋마다 `./gradlew test`가 통과해야 한다.
 - 전환(S-7) 전까지 운영은 계속 Node 앱이 맡는다. DB 스키마 변경은 전환 때 한 번에 적용한다.
 

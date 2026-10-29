@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!-- htmx는 기본값으로 4xx·5xx 응답을 화면에 넣지 않는다. 오류 안내 조각도 넣도록 4xx·5xx 모두 swap하게 한다. -->
+<head th:fragment="head(title, description)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${title}">Pinned Signal</title>
+  <meta name="description" th:content="${description}">
+  <meta name="htmx-config" content='{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true},{"code":"...","swap":true}]}'>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script th:src="@{/js/htmx-2.0.11.min.js}" defer></script>
+</head>
+</html>

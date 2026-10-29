@@ -84,4 +84,10 @@ public class ProfileReport {
         this.widgetSvgDark = widgetSvgDark;
         this.widgetSvgUpdatedAt = widgetSvgUpdatedAt;
     }
+
+    public void updateWidgetSvgs(String light, String dark, Instant updatedAt) {
+        this.widgetSvgLight = light;
+        this.widgetSvgDark = dark;
+        this.widgetSvgUpdatedAt = updatedAt;
+    }
 }

@@ -1,3 +1,7 @@
+# 리버스 프록시 뒤에서도 리포트의 위젯 주소가 바깥 origin(X-Forwarded-*)으로 만들어진다.
+server:
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: pinnedsignal

@@ -7,6 +7,9 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 ## 결정된 사항
 
 - 백엔드는 Spring Boot, 화면은 Thymeleaf 템플릿과 HTMX로 만든다. React와 Next.js는 쓰지 않는다.
+- 코드는 항상 Controller → Service → Repository 3계층으로 나눈다. Controller는 요청·응답과 화면 조각 선택만 맡고 비즈니스 규칙과 트랜잭션은 Service에, DB 접근은 Repository에 둔다. Controller가 Repository를 직접 부르지 않는다.
+- DB 접근은 Spring Data JPA를 적극적으로 쓴다. 파생 쿼리 메서드와 `@Query`로 먼저 해결하고 JPA로 표현하기 어려운 쿼리(S-4의 큐 SQL 등)도 Repository의 `@Query(nativeQuery = true)`로 둔다.
+- Lombok을 적극적으로 쓴다. 생성자 주입은 `@RequiredArgsConstructor`, getter는 `@Getter`, 로거는 `@Slf4j`로 만든다. 엔티티에는 `@Data`와 `@Setter`를 쓰지 않는다. `@Data`가 만드는 `equals`·`hashCode`·`toString`이 지연 로딩 연관을 건드리기 때문이다.
 - 진행 상황은 polling으로 보여준다. SSE와 Redis pub/sub은 옮기지 않는다.
 - Redis를 없앤다. 지금 Redis가 맡은 다섯 가지는 아래처럼 바꾼다.
 
@@ -25,6 +28,55 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 - PDF 내보내기는 이번 마이그레이션에서 뺀다. 버튼은 이미 숨겨져 있다(`d076785`). Chromium이 빠지면 이미지가 크게 작아진다. 필요해지면 Playwright for Java로 다시 만든다.
 - 운영 DB(Supabase, 스키마 `pinnedsignal`)와 기존 데이터는 그대로 쓴다. 기존 cuid ID는 문자열 PK로 다루고, 새 ID는 UUID 문자열로 만든다.
 
+## 디렉터리 구조
+
+[2026-spring-team2](https://github.com/jdk829355/2026-spring-team2)의 구조를 따른다. 최상위 패키지를 도메인으로 나누고 도메인 안을 다시 계층(`controller`, `service`, `repository` 등)으로 나눈다. 외부 API 클라이언트와 공통 설정은 `global` 아래에 둔다.
+
+```text
+build.gradle
+settings.gradle
+deploy/
+  docker-compose.yml
+src/main/java/{base}/
+  …Application.java
+  global/
+    common/          공통 상수
+    config/          RestClient, 분석 스레드풀, 스케줄링 설정
+    exception/       GlobalExceptionHandler, 사용자 문구 변환(toUserMessage)
+    filter/          요청 로그
+    util/            커밋 필터, 문자열 자르기
+    github/          GitHub 클라이언트 (dto/, exception/, service/)
+    llm/             LLM 클라이언트 (dto/, exception/, service/)
+    health/          /api/health
+  analysis/
+    controller/      메인 화면, POST /analyze, 진행 화면과 progress 조각
+    dto/request/
+    dto/response/
+    entity/          AnalysisJob, Repo, RepoAnalysis
+    enums/           AnalysisJobStatus, RepoStatus
+    repository/      AnalysisJobRepository, RepoRepository, RepoAnalysisRepository
+    service/         분석 요청(star 확인, 작업 생성), 파이프라인, 저장소 분석
+    scheduler/       PENDING 작업을 집는 폴러
+  report/
+    controller/      /report/{jobId}, /api/widget/{jobId}
+    dto/response/
+    entity/          ProfileReport
+    repository/      ProfileReportRepository
+    service/         프로필 종합, 리포트 조회, 위젯 SVG 생성
+src/main/resources/
+  application.yml
+  application-prod.yml
+  db/migration/      Flyway V1, V2
+  prompts/           LLM 프롬프트
+  templates/         analysis/, report/, error/
+  static/            js/(htmx, 리포트 화면 스크립트), css/
+src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/, service/, repository/)
+```
+
+- 도메인 사이의 호출은 Service끼리만 한다. 예를 들어 분석 파이프라인은 프로필 종합을 `report`의 Service에 맡긴다.
+- `repositories` 테이블의 엔티티는 `Repo`(`@Table(name = "repositories")`)로 짓는다. `Repository`로 지으면 Spring Data의 `Repository` 인터페이스와 이름이 겹치고 리포지토리 인터페이스 이름이 `RepositoryRepository`가 된다.
+- `pdf_exports`는 PDF를 빼므로 엔티티를 만들지 않는다.
+
 ## 사용자가 정할 것
 
 | # | 질문 | 추천 |
@@ -34,6 +86,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 | Q3 | 전환할 때 몇 분 정도 서비스가 멈춰도 되나 | 된다고 가정했다. 안 된다면 S-7 절차를 다시 짠다 |
 | Q4 | 프로필 리포트 재사용 조건을 그대로 둘까 | 그대로 둔다. S-2의 "동작 변화 주의" 참고 |
 | Q5 | 서버 메모리 여유 | 사용자가 SSH로 `free -h`를 확인한다. JVM 한 개에 힙 512MB 안팎이면 충분할 것으로 본다 |
+| Q6 | 최상위 패키지 이름(`{base}`) | `pinnedsignal`. DB 스키마 이름과 같다 |
 
 ## 진행 방식
 
@@ -42,7 +95,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 
 | # | 작업 | 예상 | 상태 |
 |---|---|---|---|
-| S-0 | 기존 동작 목록 정리, 결정 확정 | 0.5일 | 대기 (Q1~Q5) |
+| S-0 | 기존 동작 목록 정리, 결정 확정 | 0.5일 | 대기 (Q1~Q6) |
 | S-1 | Spring 프로젝트 골격 | 1일 | 대기 |
 | S-2 | DB 계층과 스키마 변경 | 1.5일 | 대기 |
 | S-3 | GitHub·LLM 클라이언트, 프롬프트, 응답 검증 | 2~3일 | 대기 |
@@ -59,11 +112,11 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 ## S-0. 기존 동작 목록 정리
 
 - Jest 테스트 300개에서 "지켜야 하는 동작"을 뽑아 이 문서 끝의 [동작 체크리스트](#동작-체크리스트)를 채운다. 테스트를 1:1로 옮기지 않고 이 목록을 기준으로 새로 쓴다.
-- Q1~Q5를 정한다.
+- Q1~Q6을 정한다.
 
 ## S-1. Spring 프로젝트 골격
 
-- **구성**: Gradle(Kotlin DSL), Spring Boot 최신 안정판, `spring-boot-starter-web`, `-thymeleaf`, `-data-jpa`, `-validation`, `-actuator`, Flyway, PostgreSQL 드라이버.
+- **구성**: Gradle(Groovy, `build.gradle`), Spring Boot 최신 안정판, `spring-boot-starter-web`, `-thymeleaf`, `-data-jpa`, `-validation`, `-actuator`, Flyway, PostgreSQL 드라이버, Lombok.
 - **정적 파일**: HTMX 2.x를 `static/js/`에 버전을 고정해 직접 넣는다(CDN 안 씀). Tailwind v4는 standalone CLI로 빌드한다. 입력은 [app/globals.css](../../app/globals.css)를 옮긴 파일, 스캔 대상은 `templates/**/*.html`이다. 빌드에 Node가 필요 없다.
 - **설정**: 환경 변수 이름을 그대로 쓴다(`GITHUB_TOKEN`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`). [lib/config.ts](../../lib/config.ts)처럼 없으면 부팅이 실패하게 한다. `REDIS_URL`은 없애고 `NEXT_PUBLIC_APP_URL`은 서버 코드 어디에서도 읽지 않으므로 함께 없앤다.
 - **DB 연결**: Prisma의 `DATABASE_URL`(`postgresql://user:pass@host/db?schema=...`)은 JDBC 형식이 아니다. `SPRING_DATASOURCE_URL`(`jdbc:postgresql://host/db?currentSchema=pinnedsignal`), `_USERNAME`, `_PASSWORD` 세 개로 나눈다. 서버 `.env`는 S-7에서 바꾼다.
@@ -241,7 +294,7 @@ Next.js(React) + BullMQ + Redis 구조를 Spring Boot + Thymeleaf + HTMX로 옮�
 - **Dockerfile**: 빌드 단계는 JDK 이미지에서 Tailwind standalone CLI와 `./gradlew bootJar`를 실행한다. 실행 단계는 Temurin JRE ARM64 이미지에 jar 하나를 둔다. Chromium, Node, Prisma 엔진이 빠진다.
 - **JVM 메모리**: `-XX:MaxRAMPercentage`로 힙 상한을 잡고, compose에 `mem_limit`를 둔다. 값은 Q5 결과로 정한다.
 - **CI** ([deploy.yml](../../.github/workflows/deploy.yml)): test 잡을 `setup-java` + `./gradlew test`로 바꾼다. build·deploy 잡은 그대로 둔다(ARM 러너, GHCR, Tailscale SSH).
-- **compose**: 서비스는 `app` 하나만 남긴다. `worker`, `redis`, `redis_data` 볼륨을 지운다. 로그 로테이션과 `restart: unless-stopped`는 유지한다. 컨테이너 이름이 바뀌면 Alloy 수집 설정(O-5)도 함께 맞춘다.
+- **compose**: 서비스는 `app` 하나만 남긴다. `worker`, `redis`, `redis_data` 볼륨을 지운다. 로그 로테이션과 `restart: unless-stopped`는 유지한다. 컨테이너 이름이 바뀌면 Alloy 수집 설정(O-5)도 함께 맞춘다. 파일은 `deploy/docker-compose.yml`로 옮기고 배포 스크립트의 `docker compose` 명령에 `-f deploy/docker-compose.yml`을 준다.
 
 ### 전환 절차
 

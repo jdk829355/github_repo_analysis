@@ -102,7 +102,7 @@ src/test/resources/
 | S-1 | Spring 프로젝트 골격 | 1일 | 완료 `2580d75` |
 | S-2 | DB 계층과 스키마 변경 | 1.5일 | 완료 `c2e9652` |
 | S-3 | GitHub·LLM 클라이언트, 프롬프트, 응답 검증 | 2~3일 | 완료 `d1cbb7a` |
-| S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 대기 |
+| S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 완료 `9a60ec2` |
 | S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 대기 |
 | S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 대기 |
 | S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 대기 |
@@ -252,6 +252,19 @@ src/test/resources/
 - **타임아웃** (10분, `ANALYSIS_TIMEOUT_MS`): 작업을 `Future`로 돌리고 `get(timeout)`이 넘으면 취소 플래그를 세운다. 저장소 루프가 매 반복마다 플래그를 확인한다. 지금의 `timedOut` 변수와 같은 방식이다. "타임아웃 뒤에도 작업이 계속 실행됨" 문제는 `Future.cancel(true)`의 인터럽트로 블로킹 HTTP 호출까지 끊을 수 있는지 함께 확인한다.
 - **위젯 SVG** ([services/widget-export.ts](../../services/widget-export.ts)): Java text block으로 옮긴다. XML 이스케이프, 줄바꿈 길이, 최대 줄 수 규칙을 그대로 둔다. 기존 저장값과 새로 만든 SVG를 바이트 단위로 비교하는 테스트를 둔다.
 - **확인**: Testcontainers Postgres와 가짜 GitHub·LLM 클라이언트로 정상, 재사용, 저장소 일부 실패, 전체 실패, 타임아웃, 재시작 복구를 테스트한다. 같은 프로필 작업이 동시에 두 개 실행되지 않는지도 확인한다.
+- **결과** (`9a60ec2`)
+  - 큐 SQL은 계획대로 `UPDATE … WHERE id = (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id`다. `updated_at`은 `timestamp(3)`(시간대 없음)에 UTC로 넣어야 해서 `now()` 대신 `now() AT TIME ZONE 'UTC'`를 쓴다. 다른 트랜잭션이 잡고 있는 작업을 건너뛰는지는 테스트로 확인했다.
+  - 폴러는 1초마다 돌면서 빈 슬롯이 있는 동안 작업을 하나씩 집는다. 슬롯은 `Semaphore`(3개)로 센다. 실행기와 타임아웃 감시기는 `AnalysisJobRunner`가 직접 만든다. 감시기를 빈으로 두면 Spring Boot의 기본 스케줄러가 물러나 폴러가 감시기와 스레드를 나눠 쓰게 되기 때문이다.
+  - 재시작 복구는 `SmartInitializingSingleton`으로 한다. 스케줄러는 컨텍스트 초기화가 끝난 뒤에 시작하므로 복구가 폴러보다 먼저 끝난다. `ApplicationReadyEvent`로 하면 폴러가 방금 집은 작업을 복구가 FAILED로 바꿀 수 있다.
+  - 타임아웃은 계획과 조금 다르다. 작업마다 `Future.get(timeout)`으로 기다리는 스레드를 두는 대신, 감시 스레드 하나가 10분 뒤 취소 플래그를 세우고 `Future.cancel(true)`로 작업 스레드를 인터럽트한다. 파이프라인은 저장소 사이, 프로필 종합 전, 완료 기록 전에 플래그를 보고 FAILED로 끝낸다. 인터럽트 플래그가 남아 있으면 Hikari가 연결을 주지 않으므로 FAILED를 쓰기 전에 플래그를 지운다.
+  - **인터럽트 확인 결과**: GitHub 호출(JDK HttpClient)은 인터럽트로 바로 끊긴다. 그래서 GitHub 요청에 타임아웃을 따로 두지 않았다. LLM 호출(OkHttp)은 인터럽트로 끊기지 않는다. 호출 하나는 요청 타임아웃 120초에 끝나지만 SDK 재시도 2회까지 더하면 최대 6분쯤 걸린다. 그동안은 슬롯도 비지 않으므로 10분을 넘긴 작업이 FAILED가 되는 시점이 최대 6분 늦어질 수 있다.
+  - 저장소 분석은 pinned 목록에서 받은 메타데이터를 그대로 쓴다. 지금은 저장소마다 사용자 저장소 목록을 다시 받는데 미리 만든 `repositories` 행에 이미 같은 값이 있어서 이 요청을 뺐다.
+  - 건너뛴 저장소는 `error_message` 없이 `SKIPPED`만 남긴다. 화면에 보일 문구는 S-5에서 정한다.
+  - 재사용 지문은 계획대로 이전 작업의 `COMPLETED` 저장소만으로 만든다. 이전에 건너뛴 저장소가 있으면 리포트는 새로 만들고 분석이 있는 저장소의 분석은 재사용한다. 프로필 종합에 넘기는 저장소도 `COMPLETED`만이다.
+  - 진행 상태 기록은 `AnalysisProgressService`의 짧은 트랜잭션으로 나눴다. 화면이 polling하므로 파이프라인 전체를 한 트랜잭션으로 묶지 않는다. `RepoAnalysis` 삭제는 파생 메서드 대신 벌크 `@Query`로 둔다. 파생 삭제는 flush가 늦어져 `repositories`를 먼저 지울 때 외래 키에 걸렸다.
+  - 위젯 SVG는 Node가 만든 출력을 골든 파일로 저장해 바이트 단위로 비교한다. 입력 4건(일반, 빈 값, 특수문자, 공백·마침표 경계)을 `cases.json`에 두고 `services/widget-export.ts`로 출력을 만들었다. JS의 `\s`와 `trim`에 맞추려고 `TextUtils`에 `JS_WHITESPACE`, `collapseWhitespace`, `splitWords`를 두었고 `CommitFilter`도 이 상수를 쓴다.
+  - 같은 프로필 작업이 동시에 두 개 실행되지 않는 것은 S-2의 partial unique index 테스트가 확인한다. 컨텍스트를 띄우는 테스트는 `analysis.polling.enabled=false`로 폴러를 끈다.
+  - 테스트는 191개이고 모두 통과한다.
 
 ## S-5. 화면과 엔드포인트
 
@@ -356,22 +369,22 @@ S-0에서 기존 테스트를 보고 채운다. 아래는 코드에서 확인한
 - [ ] 큐 등록이나 DB 저장이 실패하면 다음 요청이 새 작업을 만들 수 있다 (DB 큐에서는 `INSERT` 하나라서 자연히 지켜진다)
 
 **파이프라인**
-- [ ] pinned 저장소 0개면 `FAILED`, 실패 처리는 한 번만
-- [ ] 저장소는 순서대로 하나씩 분석하고, 하나가 실패해도 나머지는 계속한다
-- [ ] 필터 후 커밋이 0개면 `SKIPPED`
-- [ ] `full_name`과 `updated_at`이 같은 저장소는 이전 분석을 재사용한다
-- [ ] 현재 pinned 목록에 없는 이전 저장소 행은 삭제한다
-- [ ] 지문이 같고 green/red flag가 있으면 프로필 리포트를 재사용한다
-- [ ] 프로필 종합이 실패하면 대체 리포트를 저장하지 않는다
-- [ ] 10분 타임아웃이면 `FAILED`이고 그 뒤 단계로 넘어가지 않는다
-- [ ] 동시에 실행되는 분석은 최대 3개
-- [ ] 재시작 시 `PROCESSING` 작업이 `FAILED`가 된다 (새 동작)
-- [ ] README가 없으면(404) README 없이 분석한다. 다른 README 오류는 저장소 실패다
-- [ ] 저장소 실패 문구는 `toUserMessage`로 바꿔 저장하고 원본은 `repo.failed` 로그에만 남긴다
-- [ ] 저장소 행이 없거나 요약이 빈 분석만 있으면 "no eligible repositories"로 `FAILED`
-- [ ] 이전 리포트에 green/red flag가 없으면 프로필 리포트를 새로 만든다
-- [ ] 프로필 종합이 실패해도 LLM 원본 응답은 화면과 DB에 나가지 않는다
-- [ ] 위젯 SVG는 표시 크기만 줄이고 원래 좌표계를 유지한다
+- [x] pinned 저장소 0개면 `FAILED`, 실패 처리는 한 번만
+- [x] 저장소는 순서대로 하나씩 분석하고, 하나가 실패해도 나머지는 계속한다
+- [x] 필터 후 커밋이 0개면 `SKIPPED`
+- [x] `full_name`과 `updated_at`이 같은 저장소는 이전 분석을 재사용한다
+- [x] 현재 pinned 목록에 없는 이전 저장소 행은 삭제한다
+- [x] 지문이 같고 green/red flag가 있으면 프로필 리포트를 재사용한다
+- [x] 프로필 종합이 실패하면 대체 리포트를 저장하지 않는다
+- [x] 10분 타임아웃이면 `FAILED`이고 그 뒤 단계로 넘어가지 않는다
+- [x] 동시에 실행되는 분석은 최대 3개
+- [x] 재시작 시 `PROCESSING` 작업이 `FAILED`가 된다 (새 동작)
+- [x] README가 없으면(404) README 없이 분석한다. 다른 README 오류는 저장소 실패다
+- [x] 저장소 실패 문구는 `toUserMessage`로 바꿔 저장하고 원본은 `repo.failed` 로그에만 남긴다
+- [x] 저장소 행이 없거나 요약이 빈 분석만 있으면 "no eligible repositories"로 `FAILED`
+- [x] 이전 리포트에 green/red flag가 없으면 프로필 리포트를 새로 만든다
+- [x] 프로필 종합이 실패해도 LLM 원본 응답은 화면과 DB에 나가지 않는다
+- [x] 위젯 SVG는 표시 크기만 줄이고 원래 좌표계를 유지한다
 
 **조회**
 - [ ] `COMPLETED`가 아닌 작업의 리포트와 위젯은 404

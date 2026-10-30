@@ -37,6 +37,8 @@ llm:
 logging:
   structured:
     format:
-      console: pinnedsignal.global.logging.PinoJsonFormatter
+      console: logstash
+    json:
+      customizer: pinnedsignal.global.logging.LogMembersCustomizer
   level:
     root: ${LOG_LEVEL:info}

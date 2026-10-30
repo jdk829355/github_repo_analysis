@@ -44,7 +44,7 @@ src/main/java/{base}/
     config/          RestClient, 분석 스레드풀, 스케줄링 설정
     exception/       GlobalExceptionHandler, 사용자 문구 변환(toUserMessage)
     filter/          요청 로그
-    logging/         pino 형식 JSON 로그 포매터, 비밀값 마스킹
+    logging/         로그 마스킹(LogMembersCustomizer, SecretScrubber)
     util/            커밋 필터, 문자열 자르기
     github/          GitHub 클라이언트 (dto/, exception/, service/)
     llm/             LLM 클라이언트 (dto/, exception/, prompt/, service/)
@@ -133,7 +133,8 @@ src/test/resources/
 - **확인**: `./gradlew bootRun`으로 빈 페이지가 뜨고 Tailwind 클래스가 적용된다.
 - **결과** (`2580d75`)
   - Spring Boot 4부터 스타터가 기능별로 나뉘었다. 계획의 `-web` 대신 `spring-boot-starter-webmvc`를 쓰고, Flyway 자동 설정은 `spring-boot-starter-flyway`, `RestClient.Builder`는 `spring-boot-starter-restclient`(S-3에서 추가)가 있어야 생긴다.
-  - 로그는 Spring Boot 내장 형식(ECS 등)이 아니라 직접 만든 포매터 `PinoJsonFormatter`로 쓴다. 지금 pino와 같은 필드 이름(`level`, `time`, `event`, `msg`)을 써야 수집기와 대시보드를 고치지 않아도 되기 때문이다. 필드는 SLF4J fluent API의 `addKeyValue`나 MDC로 넘기고 예외는 `setCause`로 넘기면 `err`(type, message, stack과 커스텀 필드)에 들어간다. 필드 이름 마스킹과 `scrubSecrets`(`SecretScrubber`)도 같이 옮겼다.
+  - 로그는 Spring Boot 내장 `logstash` 형식으로 쓴다. 처음에는 pino와 같은 필드 이름을 맞추려고 직접 만든 포매터(`PinoJsonFormatter`)를 썼는데, 내장 형식으로 충분해서 지웠다. 필드는 SLF4J fluent API의 `addKeyValue`나 MDC로 넘기고 예외는 `setCause`로 넘긴다. `LogMembersCustomizer`를 `logging.structured.json.customizer`로 꽂아 `LoggableException`의 필드(`statusCode`, `endpoint` 등)를 `err` 아래에 남기고 필드 이름 마스킹과 `SecretScrubber`로 비밀값을 지운다. 마스킹은 `message`와 `stack_trace`를 포함해 모든 문자열에 적용된다.
+  - 필드 이름이 pino와 달라진다. `time`은 `@timestamp`(시간대 오프셋 포함), `msg`는 `message`가 되고 `level`은 이름은 같지만 값이 대문자(`INFO`)다. 예외는 `err.type`·`message`·`stack` 대신 `stack_trace` 문자열로 나온다. `event`와 직접 넘긴 필드는 최상위에 그대로 남는다. 그래서 운영 전환 전에 수집기 설정의 `level` 레이블 값과 Grafana 쿼리의 `level="error"` 같은 조건을 `ERROR`에 맞춰 고쳐야 한다.
   - 필수 환경 변수는 `@Validated` 설정 record로 받는다. 비어 있으면 Node 앱과 같은 문구(`GITHUB_TOKEN environment variable is not set`)로 부팅이 멈춘다.
   - Tailwind는 Gradle 작업이 standalone CLI(4.3.3)를 `server/.tailwind/`에 내려받아 빌드한다. HTMX는 `static/js/htmx-2.0.11.min.js`로 넣었다.
   - 로컬 Postgres 컨테이너에 붙여 `./gradlew bootRun`을 실행해 메인 화면과 Tailwind 클래스를 확인했다.

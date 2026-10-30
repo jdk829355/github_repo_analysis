@@ -5,8 +5,14 @@ server:
 spring:
   application:
     name: pinnedsignal
-  # SPRING_DATASOURCE_URL(jdbc:postgresql://host/db?currentSchema=pinnedsignal), _USERNAME, _PASSWORD로 받는다.
+  # 로컬에서는 실행 위치(server/)의 .env를 읽는다. 운영에는 파일이 없고 같은 이름의 환경 변수가 이 값보다 우선한다.
+  config:
+    import: optional:file:.env[.properties]
+  # .env에서 읽은 값은 환경 변수가 아니라서 SPRING_DATASOURCE_URL이 spring.datasource.url로 저절로 묶이지 않는다. 그래서 직접 가리킨다.
   datasource:
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
       # Supabase 세션 모드 풀이 15개이고, polling과 분석 워커 3개가 이 풀을 함께 쓴다.
       maximum-pool-size: 5

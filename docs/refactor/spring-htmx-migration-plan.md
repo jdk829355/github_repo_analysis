@@ -162,6 +162,18 @@ src/test/resources/
     ADD COLUMN position int NOT NULL DEFAULT 0,
     ADD COLUMN error_message text;
 
+  -- 같은 프로필에 진행 중인 작업이 여럿이면 가장 최근 것만 남기고 FAILED로 끝낸다.
+  UPDATE analysis_jobs
+  SET status = 'FAILED', error_message = '서버 재시작으로 분석이 중단되었습니다', updated_at = now() AT TIME ZONE 'UTC'
+  WHERE id IN (
+    SELECT id FROM (
+      SELECT id, row_number() OVER (PARTITION BY github_profile ORDER BY created_at DESC, id DESC) AS rn
+      FROM analysis_jobs
+      WHERE status IN ('PENDING', 'PROCESSING')
+    ) ranked
+    WHERE rn > 1
+  );
+
   -- 같은 프로필의 진행 중인 작업은 하나만 존재한다. Redis 락을 대신한다.
   CREATE UNIQUE INDEX analysis_jobs_active_profile_key
     ON analysis_jobs (github_profile)
@@ -172,7 +184,7 @@ src/test/resources/
     ON analysis_jobs (created_at)
     WHERE status = 'PENDING';
   ```
-- **V2 적용 전 확인**: 지금 DB에 `PENDING`/`PROCESSING`으로 멈춘 작업이 같은 프로필에 두 개 이상 있으면 unique index 생성이 실패한다. S-7에서 미리 조회해 `FAILED`로 정리한다.
+- **같은 프로필의 진행 중 작업 정리**: 지금 DB에 `PENDING`/`PROCESSING`으로 멈춘 작업이 같은 프로필에 두 개 이상 있으면 unique index 생성이 실패한다. 그래서 V2가 인덱스를 만들기 전에 프로필마다 가장 최근 작업만 남기고 나머지를 `FAILED`로 바꾼다. 남긴 작업이 `PROCESSING`이면 앱이 뜰 때 재시작 복구(S-4)가 `FAILED`로 바꾸고 `PENDING`이면 큐가 실행한다.
 - V2는 기존 Node 앱과도 호환된다. Node 앱은 `status`를 넣지 않으므로 기본값 `COMPLETED`가 들어가고, 이는 지금 의미(분석이 끝난 저장소만 행이 있음)와 같다. 그래서 전환 후 롤백할 때 DB를 되돌릴 필요가 없다.
 
 ### 저장소 행을 미리 만든다
@@ -361,24 +373,19 @@ src/test/resources/
   - compose 파일을 `deploy/`로 옮기면 Compose가 `deploy/`를 프로젝트 디렉터리로 본다. 그러면 프로젝트 이름이 `deploy`가 되고 루트의 `.env`도 읽지 않는다. 그래서 배포 스크립트는 `docker compose --project-directory . -f deploy/docker-compose.yml`로 실행한다. 서버에서 compose 명령을 직접 칠 때도 같은 옵션을 줘야 한다.
   - 서비스 이름이 `next-app`에서 `app`으로 바뀌면 예전 `next-app` 컨테이너가 3000번 포트를 쥔 채 남아 새 컨테이너가 뜨지 못한다. 그래서 배포 스크립트의 `up -d`에 `--remove-orphans`를 붙였다. 첫 배포 때 `worker`와 `redis` 컨테이너도 함께 지워지고 `redis_data` 볼륨은 남는다.
   - CI test 잡은 `setup-java`(Temurin 25)와 `gradle/actions/setup-gradle`로 `server/`에서 `./gradlew test`를 돌린다. build 잡은 컨텍스트만 `server`로 바꿨다.
-  - 확인: 이미지를 로컬에서 빌드하고 로컬 Postgres에 붙여 띄웠다. `/api/health`는 200(`database`, `poller` 모두 ok), 메인 화면과 `/css/app.css`도 200이었고 로그는 모두 JSON 한 줄이었다. `./gradlew test`는 295개가 모두 통과한다.
+  - 확인: 이미지를 로컬에서 빌드하고 로컬 Postgres에 붙여 띄웠다. `/api/health`는 200(`database`, `poller` 모두 ok), 메인 화면과 `/css/app.css`도 200이었고 로그는 모두 JSON 한 줄이었다. `./gradlew test`는 296개가 모두 통과한다.
+  - 계획에서는 전환 전에 멈춘 작업을 손으로 정리하기로 했는데 이 정리를 V2에 넣었다. 정리를 빠뜨리면 V2가 실패해 앱이 뜨지 않기 때문이다. `PollingAndQueueMigrationTest`는 V1까지 적용한 DB에 Node 앱이 남긴 형태의 중복 작업을 넣고 V2를 적용해 오래된 작업만 `FAILED`가 되는지 확인한다. V2가 이미 적용된 로컬 DB는 checksum이 달라지므로 다시 만들거나 `flyway repair`를 한다.
   - 수집기(O-5)는 아직 없어서 `level` 값이나 컨테이너 이름에 맞춰 고칠 설정도 없다. O-5를 할 때 `level` 값이 `ERROR`처럼 대문자이고 컨테이너 이름이 `github_repo_analysis-app-1`이라는 점을 반영한다.
 
 ### 전환 절차
 
 1. 서버 `.env`(저장소 루트)에 `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD`를 추가한다(S-1). URL은 기존 `DATABASE_URL`의 호스트, 포트, DB 이름으로 `jdbc:postgresql://{host}:{port}/{db}?currentSchema=pinnedsignal`처럼 만들고 사용자와 비밀번호는 따로 넣는다. 기존 변수는 롤백을 위해 남겨 둔다.
-2. 운영 DB에서 같은 프로필에 진행 중인 작업이 여럿인지 조회하고 멈춘 `PENDING`/`PROCESSING` 작업을 `FAILED`로 정리한다(V2의 unique index 생성 조건). 분석 하나는 10분 안에 끝나므로 1시간 넘게 갱신되지 않은 작업을 멈춘 것으로 본다.
+2. 손으로 정리할 작업은 없다. 같은 프로필에 진행 중인 작업이 여럿이면 V2가 인덱스를 만들기 전에 정리한다(S-2). 머지 전에 어떤 작업이 바뀔지 보고 싶으면 아래 쿼리를 돌린다.
    ```sql
-   -- 결과가 없어야 V2의 unique index가 만들어진다.
+   -- 나온 프로필마다 가장 최근 작업만 남고 나머지는 FAILED가 된다.
    SELECT github_profile, count(*) FROM pinnedsignal.analysis_jobs
    WHERE status IN ('PENDING', 'PROCESSING')
    GROUP BY github_profile HAVING count(*) > 1;
-
-   UPDATE pinnedsignal.analysis_jobs
-   SET status = 'FAILED', error_message = '서버 재시작으로 분석이 중단되었습니다',
-       updated_at = now() AT TIME ZONE 'UTC'
-   WHERE status IN ('PENDING', 'PROCESSING')
-     AND updated_at < now() AT TIME ZONE 'UTC' - interval '1 hour';
    ```
 3. `main`에 머지한다. 배포 워크플로가 새 이미지를 올리고 `docker compose up -d`를 실행한다. Spring이 뜨면서 Flyway V2가 적용된다.
 4. 확인: `/api/health`, 기존에 만들어진 `/report/{jobId}`와 `/api/widget/{jobId}?theme=dark` 몇 개, 새 분석 한 건(재사용 경로와 새 분석 경로 모두).

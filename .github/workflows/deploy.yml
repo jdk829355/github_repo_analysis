@@ -15,9 +15,6 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
 
     steps:
       - name: Checkout
@@ -61,7 +58,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: server
+          context: .
           platforms: linux/arm64
           push: true
           tags: |

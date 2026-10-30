@@ -362,6 +362,7 @@ src/test/resources/
   - 서비스 이름이 `next-app`에서 `app`으로 바뀌면 예전 `next-app` 컨테이너가 3000번 포트를 쥔 채 남아 새 컨테이너가 뜨지 못한다. 그래서 배포 스크립트의 `up -d`에 `--remove-orphans`를 붙였다. 첫 배포 때 `worker`와 `redis` 컨테이너도 함께 지워지고 `redis_data` 볼륨은 남는다.
   - CI test 잡은 `setup-java`(Temurin 25)와 `gradle/actions/setup-gradle`로 `server/`에서 `./gradlew test`를 돌린다. build 잡은 컨텍스트만 `server`로 바꿨다.
   - 확인: 이미지를 로컬에서 빌드하고 로컬 Postgres에 붙여 띄웠다. `/api/health`는 200(`database`, `poller` 모두 ok), 메인 화면과 `/css/app.css`도 200이었고 로그는 모두 JSON 한 줄이었다. `./gradlew test`는 295개가 모두 통과한다.
+  - V2는 전환 전에 운영 DB에 이미 적용돼 있었다. 그런데 V2에 중복 작업 정리 SQL을 넣어 checksum이 달라졌고 첫 배포에서 Flyway 검증이 실패해 앱이 부팅하지 못했다(사이트 502). V2를 원래 내용으로 되돌려 다시 배포했다. 정리 SQL을 넣은 커밋도 함께 되돌렸으므로 전환 절차 2단계는 수동 단계로 남는다. 다만 V2가 이미 적용돼 있어서 이번 전환에서는 하지 않았다.
   - 수집기(O-5)는 아직 없어서 `level` 값이나 컨테이너 이름에 맞춰 고칠 설정도 없다. O-5를 할 때 `level` 값이 `ERROR`처럼 대문자이고 컨테이너 이름이 `github_repo_analysis-app-1`이라는 점을 반영한다.
 
 ### 전환 절차

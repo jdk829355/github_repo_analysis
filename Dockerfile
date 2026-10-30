@@ -3,7 +3,10 @@
 # Tailwind standalone CLI가 glibc 바이너리라서 alpine이 아닌 이미지를 쓴다.
 FROM eclipse-temurin:25-jdk AS builder
 WORKDIR /app
-COPY . .
+# 빌드 컨텍스트가 저장소 루트라서 빌드에 필요한 것만 복사한다. 문서만 바뀌어도 캐시가 깨지지 않는다.
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle gradle
+COPY src src
 RUN ./gradlew --no-daemon bootJar
 
 FROM eclipse-temurin:25-jre

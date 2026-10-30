@@ -2,6 +2,8 @@
 
 리팩터링 순서(0 → 6)와 별도로 진행하는 작업이다. 운영 서버에서 서비스가 살아 있는지, 분석이 왜 실패했는지, 자원을 얼마나 쓰는지를 SSH 없이 볼 수 있게 만든다.
 
+Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로그는 Spring Boot 내장 logstash 형식이다. 완료된 O-1~O-4 절의 파일 링크와 필드 이름은 Node 앱 기준이라 지금 코드와 다르다. 바뀐 점은 [마이그레이션 계획의 S-1 결과](spring-htmx-migration-plan.md#s-1-spring-프로젝트-골격)에 있다.
+
 ## 시작 시점의 상태
 
 - 서버 한 대에서 docker compose로 `next-app`, `worker`(BullMQ), `redis`를 띄운다. DB는 외부 Supabase Postgres다.
@@ -11,17 +13,17 @@
 
 ## 결정된 사항
 
-- 로그는 pino로 stdout에 JSON 한 줄씩 쓴다. 수집은 앱이 아니라 수집기(Grafana Alloy)가 Docker 로그를 읽어서 한다.
+- 로그는 stdout에 JSON 한 줄씩 쓴다(Spring Boot 내장 logstash 형식). 수집은 앱이 아니라 수집기(Grafana Alloy)가 Docker 로그를 읽어서 한다.
 - 로그 줄마다 고정된 `event` 이름을 붙인다(`job.failed`, `repo.failed`, `llm.call` 등). 앱 메트릭은 처음에는 따로 만들지 않고 이 이벤트로 로그에서 뽑는다.
 - `jobId`, `repo`는 JSON 본문에만 넣는다. Loki 레이블은 컨테이너 이름과 `level` 정도로 둔다. 값이 계속 늘어나는 필드를 레이블로 쓰면 Loki가 느려지고 무료 한도를 넘긴다.
 - 로그 저장·대시보드·알림은 Grafana Cloud 무료 플랜을 쓴다. 계정과 토큰은 사용자가 만든다.
 - 남기지 않는 것: 토큰·API 키·DB 비밀번호, LLM 프롬프트(README와 커밋 메시지가 들어 있어 남의 비밀값이 섞일 수 있다), LLM 원본 응답(길이만 남긴다).
-- 마스킹은 두 겹이다. 필드 경로로 가리는 pino `redact`와, 에러 메시지·스택에서 `ghp_`·`github_pat_`·`sk-`·`Bearer`·URL 안 비밀번호를 지우는 `scrubSecrets`다. 둘 다 [lib/logger.ts](../../lib/logger.ts)에 있다.
+- 마스킹은 두 겹이다. 필드 이름으로 가리는 `LogMembersCustomizer`와, 에러 메시지·스택에서 `ghp_`·`github_pat_`·`sk-`·`Bearer`·URL 안 비밀번호를 지우는 `SecretScrubber`다. 둘 다 `global/logging/`에 있다.
 
 ## 진행 방식
 
 - `main` 체크아웃에서 작업한다. `main`에 push하면 배포 워크플로가 테스트 → 이미지 빌드 → 배포 순서로 돈다.
-- 확인 기준: 커밋마다 `npx jest`, `npx tsc --noEmit -p tsconfig.json`, `npx tsc --noEmit -p tsconfig.worker.json`을 실행한다. 기준선은 300개 전부 통과다(`af48034` 기준).
+- 확인 기준: 커밋마다 `./gradlew test`를 실행한다.
 
 | # | 작업 | 상태 |
 |---|---|---|
@@ -102,9 +104,10 @@
 ## O-5. Alloy로 Grafana Cloud에 로그 보내기
 
 - 사용자가 Grafana Cloud 스택을 만들고 Loki·Prometheus 주소와 토큰을 서버 `.env`에 넣는다.
-- [docker-compose.yml](../../docker-compose.yml)에 `grafana/alloy` 서비스를 추가한다. Docker 소켓은 읽기 전용으로 마운트한다. 소켓에 접근하는 컨테이너에는 사실상 호스트 권한이 있으므로 공식 이미지만 쓴다.
+- [docker-compose.yml](../../deploy/docker-compose.yml)에 `grafana/alloy` 서비스를 추가한다. Docker 소켓은 읽기 전용으로 마운트한다. 소켓에 접근하는 컨테이너에는 사실상 호스트 권한이 있으므로 공식 이미지만 쓴다.
 - `config.alloy`: `discovery.docker` → `loki.source.docker` → `loki.write`. 레이블은 컨테이너 이름과 `level`만 붙인다.
-- 확인: Grafana Explore에서 `{container="worker"} | json | event="job.started"`로 분석 하나가 보이는지 본다.
+- `level` 값은 `ERROR`처럼 대문자다. 쿼리 조건도 대문자로 쓴다.
+- 확인: Grafana Explore에서 `{container="github_repo_analysis-app-1"} | json | event="job.started"`로 분석 하나가 보이는지 본다.
 
 ## O-6. 인프라 메트릭 수집
 
@@ -127,14 +130,7 @@
 
 | 항목 | 이유 |
 |---|---|
-| SSE 라우트의 빈 `catch`에 로그 추가 | 5단계에서 SSE를 지운다 |
-| 타임아웃 이후 작업 실제 취소 | 5단계(`AbortController`). 루프 사이에 플래그를 확인해 다음 단계로 넘어가지 않게 하는 수정은 `af48034`로 넣었다. 5단계 계획과 겹치므로 그때 같이 정리한다 |
 | `prom-client`로 앱 메트릭 엔드포인트 추가 | 로그 이벤트로 먼저 본다. 실시간 큐 길이처럼 로그로 알 수 없는 값이 필요해지면 한다 |
-| 요청 접근 로그 | Next standalone은 접근 로그가 없다. 서버 앞에 리버스 프록시가 있으면 그 로그를 쓴다. 프록시 구성을 확인한 뒤 정한다 |
-| Redis 연결 끊김·재연결 로그 | ioredis 클라이언트가 네 곳에서 따로 생긴다. 연결을 정리할 때 같이 한다 |
+| 요청 접근 로그 | 앱에 요청 로그가 없다(S-1). 서버 앞에 리버스 프록시가 있으면 그 로그를 쓴다. 프록시 구성을 확인한 뒤 정한다 |
 | 브라우저 에러 수집 | 서버 로그 범위 밖이다 |
-| OpenAI SDK 내부 재시도 로그 | SDK의 logger 인터페이스가 pino와 달라 어댑터가 필요하다. `llm.call`의 `durationMs`로 먼저 본다 |
-
-## 함께 발견한 것
-
-- [docker-compose.yml](../../docker-compose.yml)에서 Redis `6379` 포트가 비밀번호 없이 호스트에 열려 있다. 앱은 컨테이너 네트워크로 접속하므로 `ports`를 지워도 동작에는 영향이 없다.
+| OpenAI SDK 내부 재시도 로그 | SDK 내부 재시도는 앱 로그에 남지 않는다. `llm.call`의 `durationMs`로 먼저 본다 |

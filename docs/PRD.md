@@ -284,6 +284,6 @@ PDF에는 다음이 포함되어야 한다.
 * Report 생성 가능
 * PDF export 가능
 * SVG 위젯 제공 가능
-* Jest tests passing
+* Gradle tests passing
 * Docker build success
 * Docker runtime success

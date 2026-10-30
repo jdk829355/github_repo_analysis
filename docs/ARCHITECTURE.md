@@ -4,59 +4,55 @@
 
 ### Frontend
 
-* Next.js 16 App Router
-* React 19
-* TypeScript
-* TailwindCSS 4
+* Thymeleaf 템플릿 (서버 렌더링)
+* HTMX 2 (분석 요청 폼, 진행 화면 polling)
+* TailwindCSS 4 (standalone CLI로 빌드)
+* 리포트 화면 스크립트 `report.js` (바닐라 JS)
 
 ---
 
 ### Backend
 
-* Next.js Route Handlers
-* BullMQ worker (별도 프로세스)
+* Java 25, Spring Boot 4 (Web MVC)
+* 분석 워커는 같은 JVM 안의 스레드풀 (3개)
 
 ---
 
 ### AI
 
-* OpenAI 호환 endpoint(현재 DeepSeek)를 사용한다. base URL, API key, model은 환경 변수로 받는다
+* OpenAI 호환 endpoint(현재 DeepSeek)를 `openai-java` SDK로 사용한다. base URL, API key, model은 환경 변수로 받는다
 * JSON 응답(`response_format: json_object`) 사용
 * temperature 0.1
-* Zod 스키마로 응답 검증
+* Java record와 Bean Validation으로 응답 검증
 
 ---
 
 ### Database
 
-* PostgreSQL
-* Prisma 5
+* PostgreSQL (Supabase)
+* Spring Data JPA (Hibernate 7)
+* Flyway
 
 ---
 
-### Cache / Queue
+### Queue
 
-* Redis (BullMQ 큐, 이벤트 pub/sub, 중복 요청 방지 키)
-
----
-
-### PDF
-
-* Playwright(Chromium)로 HTML을 렌더링해 PDF 생성
+* `analysis_jobs` 테이블 (3절)
 
 ---
 
 ### Deployment
 
-* Docker
-* docker-compose
+* Docker (컨테이너 하나)
+* docker-compose (`deploy/docker-compose.yml`)
 * GitHub Actions(`main`에 push하면 배포)
 
 ---
 
 ### Testing
 
-* Jest (ts-jest)
+* JUnit 5, AssertJ, Mockito
+* Testcontainers(Postgres), WireMock(GitHub·LLM), MockMvc
 * 브라우저 E2E 테스트는 현재 없음
 
 ---
@@ -68,16 +64,16 @@
 ```text
 User Request
 → Star Verification
-→ Job Creation
-→ Queue (BullMQ)
+→ Job Creation (PENDING 행 INSERT)
+→ Queue Poller (FOR UPDATE SKIP LOCKED)
 → Worker: GitHub Fetching
 → Repository Analysis
 → Profile Aggregation
 → Report Generation
-→ PDF Export / SVG Widget
+→ SVG Widget
 ```
 
-프로세스는 둘로 나뉜다. `next-app`은 요청을 받아 job을 만들고 큐에 넣는다. `worker`는 큐에서 job을 꺼내 분석을 수행한다. `next-app`은 Worker를 만들지 않는다.
+웹 요청과 분석 워커가 한 JVM에서 돈다. 요청은 `PENDING` 작업 행만 만들고 1초마다 도는 폴러가 빈 슬롯이 있을 때 작업을 하나씩 집어 스레드풀에서 실행한다. 서버는 한 대라고 가정한다.
 
 ---
 
@@ -90,18 +86,18 @@ User Request
 ```text
 submit url
 → verify star
-→ create job (jobId 선생성, Redis 키로 중복 요청 방지)
-→ enqueue analysis (BullMQ)
+→ create job (PENDING 행 INSERT, partial unique index로 중복 요청 방지)
+→ poller가 PENDING 작업을 PROCESSING으로 바꿔 집음
 → worker 실행 (동시 3개)
-→ SSE로 진행 상황 전달
+→ 화면이 2초마다 진행 상태 polling
 → generate report
 ```
 
-* Job 상태는 `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`이다.
-* 같은 profile의 진행 중 job이 있으면 새로 만들지 않고 그 jobId를 반환한다. 이 판단은 Redis `SET NX`로 원자적으로 한다.
-* BullMQ 재시도는 쓰지 않는다(`attempts: 1`).
-* 진행 상황과 완료·실패 여부는 SSE(`GET /api/analysis/[jobId]/events`)로 전달한다. 실패하면 `job_failed` 이벤트로 실패 화면을 보여준다.
-* `COMPLETED`가 아닌 job은 리포트가 저장돼 있어도 조회·PDF·위젯 요청에 404로 응답한다.
+* Job 상태는 `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`이다. 저장소별 상태(`PENDING`, `ANALYZING`, `COMPLETED`, `SKIPPED`, `FAILED`)는 `repositories.status`에 남는다.
+* 같은 profile의 진행 중 job이 있으면 새로 만들지 않고 그 jobId를 반환한다. `analysis_jobs(github_profile)`에 진행 중인 작업만 대상으로 하는 partial unique index가 이를 보장한다.
+* 재시도는 하지 않는다. 앱이 재시작되면 `PROCESSING`으로 남은 작업은 `FAILED`가 된다.
+* 진행 화면은 `GET /analysis/{jobId}/progress`를 2초마다 불러 HTML 조각을 바꿔 끼운다. 완료되면 리포트로 이동하고 실패하면 실패 문구를 보여 주고 polling을 멈춘다(HTTP 286).
+* `COMPLETED`가 아닌 job은 리포트가 저장돼 있어도 조회·위젯 요청에 404로 응답한다.
 
 ---
 
@@ -115,20 +111,15 @@ submit url
 * profile_reports
 * pdf_exports
 
-`profile_reports`에는 위젯 SVG(라이트·다크)도 함께 저장한다.
+`profile_reports`에는 위젯 SVG(라이트·다크)도 함께 저장한다. `pdf_exports` 테이블은 남아 있지만 PDF 내보내기를 뺐으므로 쓰지 않는다.
 
 ---
 
-## 5. Redis Usage
+## 5. Cache
 
-Redis는 다음 용도로 쓴다.
+Redis는 쓰지 않는다. 큐, 진행 상태, 중복 요청 방지는 모두 PostgreSQL이 맡는다(3절).
 
-* BullMQ 큐
-* 진행 이벤트 pub/sub 채널
-* 중복 요청 방지 키 (`job:{url hash}`, TTL 1시간)
-* job 상태와 repository 목록 (TTL 1시간)
-
-GitHub API 응답, README, commit log는 Redis에 캐싱하지 않는다. 분석 결과 재사용([PRD 5.7](PRD.md#57-이전-분석-재사용))은 PostgreSQL에 저장된 이전 결과를 쓴다.
+GitHub API 응답, README, commit log는 캐싱하지 않는다. 분석 결과 재사용([PRD 5.7](PRD.md#57-이전-분석-재사용))은 PostgreSQL에 저장된 이전 결과를 쓴다.
 
 ---
 
@@ -182,7 +173,7 @@ LLM은 반드시 structured output을 사용해야 한다.
 규칙:
 
 * raw freeform response 금지
-* zod validation 필수
+* 응답 검증 필수 (record + Bean Validation)
 * 낮은 temperature(0.1) 사용
 * 빈 응답, malformed response, schema mismatch가 나오면 앱이 재시도한다(9절 참조)
 
@@ -217,14 +208,14 @@ LLM은 반드시 structured output을 사용해야 한다.
 |---|---|---|---|
 | 429, 5xx, 연결 오류, 타임아웃 | SDK | 2 | SDK의 지수 백오프 |
 | 400, 401, 403, 404 등 | 없음 | 0 | — |
-| 빈 응답, JSON 파싱 실패, Zod 검증 실패 | 앱 | 2 | 1초, 2초 |
+| 빈 응답, JSON 파싱 실패, 응답 검증 실패 | 앱 | 2 | 1초, 2초 |
 
 * 앱은 SDK 오류를 다시 시도하지 않는다. 둘 다 재시도하면 호출이 최대 9번까지 나간다.
 * 호출 1회의 타임아웃은 2분이다. 전체 분석 타임아웃(10분)과는 별개다.
 
 ---
 
-### BullMQ
+### Analysis Job
 
 * job 단위 재시도 없음
 
@@ -236,7 +227,7 @@ LLM은 반드시 structured output을 사용해야 한다.
 
 검증 대상:
 
-* request body 형식 (Zod 스키마)
+* 요청 형식
 * GitHub URL format
 * analysis timeout
 * invalid characters

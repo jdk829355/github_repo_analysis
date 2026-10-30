@@ -107,7 +107,7 @@ src/test/resources/
 | S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 완료 `ae03a82` |
 | S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 완료 |
 | S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 진행 중 (배포 완료, 운영 확인 대기) |
-| S-8 | Node 코드 제거, 루트로 이동, 문서 갱신 | 0.5일 | 대기 |
+| S-8 | Node 코드 제거, 루트로 이동, 문서 갱신 | 0.5일 | 완료 |
 
 합계는 약 2.5~3주다. 가장 큰 위험은 S-4의 파이프라인 동작(재사용 규칙, 타임아웃, 실패 처리)을 지금과 똑같이 맞추는 일이다.
 
@@ -395,6 +395,12 @@ src/test/resources/
 
 - Node 관련 파일을 지운다: `app/`, `components/`, `lib/`, `services/`, `prompts/`, `schemas/`, `workers/`, `types/`, `tests/`, `prisma/`, `package*.json`, `tsconfig*`, `next.config.ts`, `jest.config.js`, `eslint.config.mjs`, `postcss.config.mjs`, `public/`의 Next 기본 아이콘.
 - `server/`의 내용을 루트로 올리고 CI의 `working-directory`와 build 컨텍스트를 루트 기준으로 고친다.
+- **결과**
+  - Node 코드와 설정 파일(`app/`, `components/`, `lib/`, `services/`, `prompts/`, `schemas/`, `workers/`, `types/`, `tests/`, `prisma/`, `public/`, `package*.json`, `tsconfig*`, `next.config.ts`, `jest.config.js`, `eslint.config.mjs`, `postcss.config.mjs`, 루트 `.env.example`)를 지웠다. `public/`에는 Next 기본 아이콘만 있었고 파비콘은 S-5에서 `static/`으로 옮겼다. 화면 디자인 참고 자료인 `stitch-screens/`는 남겼다.
+  - `server/`의 내용을 루트로 올렸다. CI의 `working-directory`를 지우고 build 컨텍스트를 `.`으로 바꿨다. 컨텍스트가 루트가 되어 Dockerfile은 `COPY . .` 대신 빌드에 필요한 파일만 복사한다. 그래서 문서만 바뀌었을 때 빌드 캐시가 깨지지 않는다.
+  - `.gitignore`는 Node 항목을 지우고 Gradle·Tailwind·IDE 항목을 더했다. 로컬의 `server/.env`와 Tailwind CLI는 루트로 옮겼다. `server/`에는 IDE 설정과 빌드 캐시만 남는다.
+  - 문서는 ARCHITECTURE, DEVELOPMENT, ROADMAP, PRD(완료 조건의 테스트 항목), observability-plan을 고쳤다. [docs/CLAUDE.md](../CLAUDE.md)에는 Node 관련 내용이 없어서 그대로 뒀다. 이 문서의 줄 번호와 Node 파일 링크는 맨 위에 적은 대로 `c51159d` 기준이라 고치지 않았다.
+  - `./gradlew test` 295개가 모두 통과하고 루트 컨텍스트로 빌드한 이미지에 CSS·템플릿·마이그레이션이 들어 있다.
 - 문서를 현재 구조로 고친다: [ARCHITECTURE.md](../ARCHITECTURE.md)(3절 Background Job), [DEVELOPMENT.md](../DEVELOPMENT.md), [ROADMAP.md](../ROADMAP.md)("향후 변경 예정"의 SSE 항목), [docs/CLAUDE.md](../CLAUDE.md), [observability-plan.md](observability-plan.md)(pino·Redis 언급).
 - 6단계(수동 재시도)는 이 구조에서 "같은 프로필로 새 `PENDING` 작업 만들기"로 단순해진다. 마이그레이션이 끝난 뒤 진행한다.
 

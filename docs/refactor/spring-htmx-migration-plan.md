@@ -85,11 +85,11 @@ src/test/resources/
 
 | # | 질문 | 추천 |
 |---|---|---|
-| Q1 | 코드를 어디서 개발하나 | 결정: 별도 워크트리에서 브랜치 `refactor/spring-migration`으로 개발한다. 메인 저장소는 `main`에 두고 운영 중인 Node 앱을 고치는 데 쓴다. Spring 프로젝트는 `server/` 디렉터리에 만들고 전환 커밋(S-7)에서 Node 코드를 지우고 루트로 올린다 |
+| Q1 | 코드를 어디서 개발하나 | 결정: 별도 워크트리에서 브랜치 `refactor/spring-migration`으로 개발한다. 메인 저장소는 `main`에 두고 운영 중인 Node 앱을 고치는 데 쓴다. Spring 프로젝트는 `server/` 디렉터리에 만든다. 전환(S-7)에서는 `server/`를 그대로 두고 배포 설정만 바꾼다. Node 코드 삭제와 루트 이동은 S-8에서 한다 |
 | Q2 | Java 버전 | 결정: 25. Spring Boot 4.1.2, Hibernate 7.4, Lombok 1.18.48과 함께 빌드와 테스트가 문제없이 돈다 |
 | Q3 | 전환할 때 몇 분 정도 서비스가 멈춰도 되나 | 결정: 된다고 보고 진행한다. 안 된다면 S-7 절차를 다시 짠다 |
 | Q4 | 프로필 리포트 재사용 조건을 그대로 둘까 | 결정: 그대로 둔다. S-4에서 이전 작업의 저장소를 `status = COMPLETED`로 걸러 지문을 만든다(S-2 "동작 변화 주의") |
-| Q5 | 서버 메모리 여유 | 대기(사용자). S-7 전에 SSH로 `free -h`를 확인한다. 그때까지는 JVM 힙 512MB 안팎으로 가정한다 |
+| Q5 | 서버 메모리 여유 | 결정: 서버 메모리는 3.7GiB이고 Node 앱이 도는 지금 여유(available)가 2.4GiB다. compose `mem_limit: 1g`, `-XX:MaxRAMPercentage=70`(힙 약 700MB)으로 둔다 |
 | Q6 | 최상위 패키지 이름(`{base}`) | 결정: `pinnedsignal`. DB 스키마 이름과 같다 |
 
 ## 진행 방식
@@ -106,8 +106,8 @@ src/test/resources/
 | S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 완료 `9a60ec2` |
 | S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 완료 `ae03a82` |
 | S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 완료 |
-| S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 대기 |
-| S-8 | Node 코드 제거, 문서 갱신 | 0.5일 | 대기 |
+| S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 진행 중 (배포 설정 완료, 운영 전환 대기) |
+| S-8 | Node 코드 제거, 루트로 이동, 문서 갱신 | 0.5일 | 대기 |
 
 합계는 약 2.5~3주다. 가장 큰 위험은 S-4의 파이프라인 동작(재사용 규칙, 타임아웃, 실패 처리)을 지금과 똑같이 맞추는 일이다.
 
@@ -354,23 +354,46 @@ src/test/resources/
 - **JVM 메모리**: `-XX:MaxRAMPercentage`로 힙 상한을 잡고, compose에 `mem_limit`를 둔다. 값은 Q5 결과로 정한다.
 - **CI** ([deploy.yml](../../.github/workflows/deploy.yml)): test 잡을 `setup-java` + `./gradlew test`로 바꾼다. build·deploy 잡은 그대로 둔다(ARM 러너, GHCR, Tailscale SSH).
 - **compose**: 서비스는 `app` 하나만 남긴다. `worker`, `redis`, `redis_data` 볼륨을 지운다. 로그 로테이션과 `restart: unless-stopped`는 유지한다. 컨테이너 이름이 바뀌면 Alloy 수집 설정(O-5)도 함께 맞춘다. 파일은 `deploy/docker-compose.yml`로 옮기고 배포 스크립트의 `docker compose` 명령에 `-f deploy/docker-compose.yml`을 준다.
+- **결과** (배포 설정)
+  - `server/Dockerfile`은 `eclipse-temurin:25-jdk`에서 `./gradlew bootJar`로 jar를 만들고 `eclipse-temurin:25-jre`에서 `app` 사용자로 실행한다. Tailwind standalone CLI가 glibc 바이너리라서 alpine 이미지는 쓰지 않는다. CLI는 Gradle 작업이 빌드 중에 내려받는다. 빌드 컨텍스트가 `server/`로 바뀌어 루트의 Node용 `Dockerfile`과 `.dockerignore`는 지웠다.
+  - 메모리는 Q5에 따라 `mem_limit: 1g`, `-XX:MaxRAMPercentage=70`으로 두었다. 로컬에서 768MB 한도로 띄웠을 때 기동 직후 컨테이너 메모리는 약 400MB였다. 전환하면 Node 앱, 워커, Redis가 빠지므로 서버의 여유 메모리는 지금보다 늘어난다.
+  - 컨테이너 안에서는 Spring 기본 포트 8080으로 듣고 compose가 `3000:8080`으로 연결한다. 바깥 포트가 그대로라 리버스 프록시 설정은 바꾸지 않는다.
+  - compose 파일을 `deploy/`로 옮기면 Compose가 `deploy/`를 프로젝트 디렉터리로 본다. 그러면 프로젝트 이름이 `deploy`가 되고 루트의 `.env`도 읽지 않는다. 그래서 배포 스크립트는 `docker compose --project-directory . -f deploy/docker-compose.yml`로 실행한다. 서버에서 compose 명령을 직접 칠 때도 같은 옵션을 줘야 한다.
+  - 서비스 이름이 `next-app`에서 `app`으로 바뀌면 예전 `next-app` 컨테이너가 3000번 포트를 쥔 채 남아 새 컨테이너가 뜨지 못한다. 그래서 배포 스크립트의 `up -d`에 `--remove-orphans`를 붙였다. 첫 배포 때 `worker`와 `redis` 컨테이너도 함께 지워지고 `redis_data` 볼륨은 남는다.
+  - CI test 잡은 `setup-java`(Temurin 25)와 `gradle/actions/setup-gradle`로 `server/`에서 `./gradlew test`를 돌린다. build 잡은 컨텍스트만 `server`로 바꿨다.
+  - 확인: 이미지를 로컬에서 빌드하고 로컬 Postgres에 붙여 띄웠다. `/api/health`는 200(`database`, `poller` 모두 ok), 메인 화면과 `/css/app.css`도 200이었고 로그는 모두 JSON 한 줄이었다. `./gradlew test`는 295개가 모두 통과한다.
+  - 수집기(O-5)는 아직 없어서 `level` 값이나 컨테이너 이름에 맞춰 고칠 설정도 없다. O-5를 할 때 `level` 값이 `ERROR`처럼 대문자이고 컨테이너 이름이 `github_repo_analysis-app-1`이라는 점을 반영한다.
 
 ### 전환 절차
 
-1. 서버 `.env`에 `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD`를 추가한다(S-1). 기존 변수는 롤백을 위해 남겨 둔다.
-2. 운영 DB에서 같은 프로필에 진행 중인 작업이 여럿인지 조회하고, 멈춘 `PENDING`/`PROCESSING` 작업을 `FAILED`로 정리한다(V2의 unique index 생성 조건).
+1. 서버 `.env`(저장소 루트)에 `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD`를 추가한다(S-1). URL은 기존 `DATABASE_URL`의 호스트, 포트, DB 이름으로 `jdbc:postgresql://{host}:{port}/{db}?currentSchema=pinnedsignal`처럼 만들고 사용자와 비밀번호는 따로 넣는다. 기존 변수는 롤백을 위해 남겨 둔다.
+2. 운영 DB에서 같은 프로필에 진행 중인 작업이 여럿인지 조회하고 멈춘 `PENDING`/`PROCESSING` 작업을 `FAILED`로 정리한다(V2의 unique index 생성 조건). 분석 하나는 10분 안에 끝나므로 1시간 넘게 갱신되지 않은 작업을 멈춘 것으로 본다.
+   ```sql
+   -- 결과가 없어야 V2의 unique index가 만들어진다.
+   SELECT github_profile, count(*) FROM pinnedsignal.analysis_jobs
+   WHERE status IN ('PENDING', 'PROCESSING')
+   GROUP BY github_profile HAVING count(*) > 1;
+
+   UPDATE pinnedsignal.analysis_jobs
+   SET status = 'FAILED', error_message = '서버 재시작으로 분석이 중단되었습니다',
+       updated_at = now() AT TIME ZONE 'UTC'
+   WHERE status IN ('PENDING', 'PROCESSING')
+     AND updated_at < now() AT TIME ZONE 'UTC' - interval '1 hour';
+   ```
 3. `main`에 머지한다. 배포 워크플로가 새 이미지를 올리고 `docker compose up -d`를 실행한다. Spring이 뜨면서 Flyway V2가 적용된다.
 4. 확인: `/api/health`, 기존에 만들어진 `/report/{jobId}`와 `/api/widget/{jobId}?theme=dark` 몇 개, 새 분석 한 건(재사용 경로와 새 분석 경로 모두).
-5. 이상이 없으면 Redis 컨테이너와 볼륨을 지운다(`docker compose down`에서 빠진 서비스는 남아 있을 수 있다. `docker compose up -d --remove-orphans`).
+5. 이상이 없으면 Redis 볼륨을 지운다(`docker volume rm github_repo_analysis_redis_data`). Redis 컨테이너는 배포 스크립트의 `--remove-orphans`가 이미 지웠다.
 
 ### 롤백
 
 - 머지 커밋을 revert해 다시 배포한다. 이전 compose(Node 앱, 워커, Redis)와 이미지가 돌아온다.
+- 되돌린 워크플로는 `--remove-orphans` 없이 `docker compose up -d`를 실행한다. 그러면 Spring `app` 컨테이너가 3000번 포트를 쥔 채 남아 `next-app`이 뜨지 못하므로, 되돌린 커밋을 배포하기 전에 서버에서 `docker compose --project-directory . -f deploy/docker-compose.yml down`으로 Spring 컨테이너를 내린다.
 - V2 스키마 변경은 Node 앱과 호환되므로 DB는 되돌리지 않는다(S-2).
 
 ## S-8. Node 코드 제거, 문서 갱신
 
 - Node 관련 파일을 지운다: `app/`, `components/`, `lib/`, `services/`, `prompts/`, `schemas/`, `workers/`, `types/`, `tests/`, `prisma/`, `package*.json`, `tsconfig*`, `next.config.ts`, `jest.config.js`, `eslint.config.mjs`, `postcss.config.mjs`, `public/`의 Next 기본 아이콘.
+- `server/`의 내용을 루트로 올리고 CI의 `working-directory`와 build 컨텍스트를 루트 기준으로 고친다.
 - 문서를 현재 구조로 고친다: [ARCHITECTURE.md](../ARCHITECTURE.md)(3절 Background Job), [DEVELOPMENT.md](../DEVELOPMENT.md), [ROADMAP.md](../ROADMAP.md)("향후 변경 예정"의 SSE 항목), [docs/CLAUDE.md](../CLAUDE.md), [observability-plan.md](observability-plan.md)(pino·Redis 언급).
 - 6단계(수동 재시도)는 이 구조에서 "같은 프로필로 새 `PENDING` 작업 만들기"로 단순해진다. 마이그레이션이 끝난 뒤 진행한다.
 

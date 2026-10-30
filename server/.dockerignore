@@ -1,0 +1,7 @@
+.gradle
+build
+.tailwind
+.idea
+*.iml
+.env
+.DS_Store

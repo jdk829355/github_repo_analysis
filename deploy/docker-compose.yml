@@ -1,0 +1,28 @@
+# 저장소 루트에서 `docker compose --project-directory . -f deploy/docker-compose.yml`로 실행한다.
+# 그래야 프로젝트 이름(github_repo_analysis)과 변수 파일(루트의 .env)이 예전과 같다.
+
+# 컨테이너 로그가 디스크를 채우지 않도록 서비스마다 최대 30MB만 보관한다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    # CI가 GHCR에 올린 이미지를 쓴다. 롤백은 IMAGE_TAG=<커밋 SHA>로 지정한다.
+    image: ghcr.io/jdk829355/github_repo_analysis:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    logging: *default-logging
+    # JVM 힙은 이 한도의 70%다(Dockerfile의 MaxRAMPercentage).
+    mem_limit: 1g
+    ports:
+      - "3000:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}

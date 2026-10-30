@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ko" class="antialiased" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('저장소 분석 중 - Pinned Signal', 'GitHub 프로필 분석 진행 상황')}"></head>
+<body class="min-h-full flex flex-col bg-[#f9f9ff]">
+  <main class="flex min-h-screen items-center justify-center bg-[#f9f9ff] p-4 text-[#181c22] sm:p-6 md:p-8">
+    <div class="w-full max-w-[600px]">
+      <div class="mb-8 text-center">
+        <h1 class="mb-2 text-[32px] font-bold leading-10 tracking-tight text-[#181c22]">저장소 분석 중...</h1>
+        <p class="text-base leading-6 text-[#414753]">연결된 저장소에서 인사이트를 수집하고 있습니다.</p>
+      </div>
+
+      <th:block th:replace="~{analysis/fragments/progress :: progress}"></th:block>
+    </div>
+  </main>
+</body>
+</html>

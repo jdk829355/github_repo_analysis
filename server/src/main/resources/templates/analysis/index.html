@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko" class="antialiased" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Pinned Signal', 'GitHub 프로필을 분석하여 프로젝트, 역할, 엔지니어링 강점을 발견하세요')}"></head>
+<body class="min-h-full flex flex-col bg-[#f9f9ff]">
+  <main class="min-h-screen bg-[#f9f9ff] text-[#181c22] flex flex-col items-center justify-center px-6 py-12">
+    <div class="w-full max-w-4xl text-center">
+      <div class="mb-8 space-y-4">
+        <h1 class="text-[40px] leading-[48px] md:text-[48px] md:leading-[56px] font-extrabold tracking-tight text-[#181c22]">
+          Pinned Signal
+        </h1>
+        <p class="mx-auto max-w-2xl text-base leading-6 text-[#414753]">
+          GitHub 프로필을 분석하여 프로젝트, 역할, 엔지니어링 강점을 발견하세요
+        </p>
+      </div>
+
+      <div class="flex justify-center">
+        <div class="w-full max-w-3xl space-y-4">
+          <form hx-post="/analyze" hx-target="#analyze-result" hx-swap="innerHTML"
+                hx-disabled-elt="find input, find button"
+                class="group relative flex flex-col items-center justify-center gap-2 sm:flex-row">
+            <label class="relative w-full">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#717785]">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.69a4 4 0 015.66 5.66l-2.83 2.83a4 4 0 01-5.66 0m.45-1.87a4 4 0 01-5.66-5.66l2.83-2.83a4 4 0 015.66 0" />
+                </svg>
+              </span>
+              <input type="text" name="url" autocomplete="off" placeholder="https://github.com/username"
+                     onfocus="if (!this.value) this.value = 'https://github.com/'"
+                     oninput="document.getElementById('analyze-result').replaceChildren()"
+                     class="w-full rounded-lg border border-[#717785] bg-white py-4 pl-12 pr-4 text-base leading-6 text-[#181c22] shadow-sm transition-all placeholder:text-[#c1c6d5] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#005ab4] disabled:cursor-not-allowed disabled:opacity-60">
+            </label>
+            <button type="submit"
+                    class="flex min-h-[58px] w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[#005ab4] px-8 py-4 text-xs font-semibold uppercase tracking-[0.5px] text-white shadow-sm transition-colors hover:bg-[#0a73e0] focus:outline-none focus:ring-2 focus:ring-[#005ab4] focus:ring-offset-2 focus:ring-offset-[#f9f9ff] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+              <span class="flex items-center gap-1 group-[.htmx-request]:hidden">
+                <span>분석하기</span>
+                <svg class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 12h14" />
+                </svg>
+              </span>
+              <span class="hidden h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white group-[.htmx-request]:block"></span>
+            </button>
+          </form>
+          <div id="analyze-result"></div>
+        </div>
+      </div>
+
+      <div class="mt-24 grid w-full grid-cols-1 gap-4 md:grid-cols-3">
+        <section class="rounded-xl border border-[#e0e2eb] bg-[#f1f3fc] p-6 text-center shadow-sm">
+          <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#d6e3ff] text-[#005ab4]">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 19V5m0 14h16M8 16v-5m4 5V8m4 8v-3" />
+            </svg>
+          </div>
+          <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#181c22]">저장소 분석</h2>
+          <p class="text-sm leading-5 text-[#414753]">리드미, 커밋 기록, 스타 수, 포크 수를 분석하여 프로젝트 유형과 기여도를 파악해요.</p>
+        </section>
+        <section class="rounded-xl border border-[#e0e2eb] bg-[#f1f3fc] p-6 text-center shadow-sm">
+          <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#d6e3ff] text-[#005ab4]">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l-4 3 4 3m8-6l4 3-4 3M13 5l-2 14" />
+            </svg>
+          </div>
+          <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#181c22]">기술 스택 분석</h2>
+          <p class="text-sm leading-5 text-[#414753]">사용된 언어와 프레임워크를 시각화하여 강점을 파악해요.</p>
+        </section>
+        <section class="rounded-xl border border-[#e0e2eb] bg-[#f1f3fc] p-6 text-center shadow-sm">
+          <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#d6e3ff] text-[#005ab4]">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 6h4m-7 4h10M7 14h6m-8 6h14a2 2 0 002-2V8a2 2 0 00-2-2h-3.5L14 4h-4L8.5 6H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.5px] text-[#181c22]">프로필 요약</h2>
+          <p class="text-sm leading-5 text-[#414753]">분석 정보를 종합해서 프로필에 대한 분석을 제공해요.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,88 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'pinnedsignal'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'com.openai:openai-java:4.94.0'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Tailwind v4 standalone CLI로 CSS를 만든다. 빌드에 Node가 필요 없다.
+def tailwindVersion = '4.3.3'
+def tailwindBinary = file(".tailwind/tailwindcss-${tailwindVersion}")
+def tailwindOutput = layout.buildDirectory.dir('generated/tailwind')
+
+tasks.register('downloadTailwind') {
+    def os = System.getProperty('os.name').toLowerCase()
+    def arch = System.getProperty('os.arch')
+    def platform = (os.contains('mac') ? 'macos' : 'linux') + '-' + (arch in ['aarch64', 'arm64'] ? 'arm64' : 'x64')
+    def url = "https://github.com/tailwindlabs/tailwindcss/releases/download/v${tailwindVersion}/tailwindcss-${platform}"
+    outputs.file(tailwindBinary)
+    onlyIf { !tailwindBinary.exists() }
+    doLast {
+        tailwindBinary.parentFile.mkdirs()
+        URI.create(url).toURL().withInputStream { input -> tailwindBinary.withOutputStream { it << input } }
+        tailwindBinary.setExecutable(true)
+    }
+}
+
+tasks.register('tailwindBuild', Exec) {
+    dependsOn 'downloadTailwind'
+    inputs.file('src/main/tailwind/app.css')
+    inputs.dir('src/main/resources/templates')
+    inputs.dir('src/main/resources/static/js')
+    outputs.dir(tailwindOutput)
+    commandLine tailwindBinary.absolutePath,
+            '-i', 'src/main/tailwind/app.css',
+            '-o', tailwindOutput.get().file('static/css/app.css').asFile.absolutePath,
+            '--minify'
+}
+
+sourceSets.main.resources.srcDir(tasks.named('tailwindBuild'))

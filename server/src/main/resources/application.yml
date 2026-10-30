@@ -1,0 +1,50 @@
+# 리버스 프록시 뒤에서도 리포트의 위젯 주소가 바깥 origin(X-Forwarded-*)으로 만들어진다.
+server:
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: pinnedsignal
+  # 로컬에서는 실행 위치(server/)의 .env를 읽는다. 운영에는 파일이 없고 같은 이름의 환경 변수가 이 값보다 우선한다.
+  config:
+    import: optional:file:.env[.properties]
+  # .env에서 읽은 값은 환경 변수가 아니라서 SPRING_DATASOURCE_URL이 spring.datasource.url로 저절로 묶이지 않는다. 그래서 직접 가리킨다.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      # Supabase 세션 모드 풀이 15개이고, polling과 분석 워커 3개가 이 풀을 함께 쓴다.
+      maximum-pool-size: 5
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      # 컬럼은 timestamp(3)(시간대 없음)이고 Prisma가 UTC로 넣었다. Instant를 그 형식 그대로 UTC로 읽고 쓴다.
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    schemas: pinnedsignal
+    # 운영 DB에는 이미 V1 스키마가 있으므로 V1을 건너뛴다. 빈 DB(로컬, Testcontainers)에서는 V1부터 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  thymeleaf:
+    cache: true
+
+# 환경 변수 이름을 Node 앱과 같게 쓴다. 없으면 @NotBlank 검증으로 부팅이 실패한다.
+github:
+  token: ${GITHUB_TOKEN:}
+llm:
+  base-url: ${LLM_BASE_URL:}
+  api-key: ${LLM_API_KEY:}
+  model: ${LLM_MODEL:}
+
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      customizer: pinnedsignal.global.logging.LogMembersCustomizer
+  level:
+    root: ${LOG_LEVEL:info}

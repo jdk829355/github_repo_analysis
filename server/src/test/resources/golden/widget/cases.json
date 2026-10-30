@@ -1,0 +1,54 @@
+[
+  {
+    "name": "typical",
+    "report": {
+      "githubUsername": "octocat",
+      "overallSummary": "백엔드 API 설계와 데이터 모델링에 강점이 있는 개발자입니다. Spring Boot와 PostgreSQL로 여러 서비스를 직접 운영했고, 배포 자동화와 모니터링까지 맡아 왔습니다. 팀 프로젝트에서는 코드 리뷰와 문서화를 주도했습니다. 최근에는 LLM을 서비스에 붙이는 작업에 관심을 두고 있습니다.",
+      "roleEstimation": { "primary": "Backend", "secondary": ["DevOps", "Data"], "recommended": ["Platform"] },
+      "greenFlags": [
+        "커밋 메시지가 일관되고 변경 이유가 분명하게 적혀 있습니다.",
+        "테스트 코드를 기능과 함께 꾸준히 추가합니다.",
+        "README에 실행 방법과 설계 결정이 정리되어 있습니다.",
+        "네 번째 항목은 화면에 나오지 않는다."
+      ],
+      "redFlags": [
+        "프론트엔드 경험을 보여주는 저장소가 없습니다.",
+        "대형 저장소에서 기여한 흔적이 적습니다."
+      ],
+      "repositoryLanguages": ["Java", "Java", "TypeScript", "Go", "Python", "Rust", ""]
+    }
+  },
+  {
+    "name": "empty",
+    "report": {
+      "githubUsername": "",
+      "overallSummary": "",
+      "roleEstimation": { "primary": "", "secondary": [], "recommended": [] },
+      "greenFlags": [],
+      "redFlags": [],
+      "repositoryLanguages": ["", ""]
+    }
+  },
+  {
+    "name": "special-characters",
+    "report": {
+      "githubUsername": "a-b",
+      "overallSummary": "Builds <fast> & \"safe\" tools that don't break. It is written in plain English so that the line wrapping is exercised at the seventy character limit, and it keeps going on and on until the third line must end with the ellipsis marker.",
+      "roleEstimation": { "primary": "Full-Stack & Cloud", "secondary": [], "recommended": [] },
+      "greenFlags": ["Handles <script> & 'quotes' safely", "https://example.com/a/very/long/url/that/has/no/spaces/and/exceeds/thirty/characters/by/far"],
+      "redFlags": ["한 줄로 끝나는 짧은 문장."],
+      "repositoryLanguages": ["C++", "C#"]
+    }
+  },
+  {
+    "name": "whitespace-and-period",
+    "report": {
+      "githubUsername": "ws",
+      "overallSummary": "첫 줄\n둘째 줄\t탭 NBSP　전각 공백   연속 공백 이 문장은 일흔 글자를 넘기도록 조금 길게 씁니다 그리고 세 번째 줄에서 마침표로 끝납니다. 이 뒤는 잘려 나갑니다 이 뒤는 잘려 나갑니다 이 뒤는 잘려 나갑니다 이 뒤는 잘려 나갑니다 이 뒤는 잘려 나갑니다 이 뒤는 잘려 나갑니다.",
+      "roleEstimation": { "primary": "Backend", "secondary": [], "recommended": [] },
+      "greenFlags": ["일이삼사오육칠팔구십일이삼사오육칠팔구십일이삼사오육칠팔구십일이삼사오육칠팔구십 마침표로 끝납니다. 잘림"],
+      "redFlags": ["1", "2", "3", "4"],
+      "repositoryLanguages": ["Kotlin"]
+    }
+  }
+]

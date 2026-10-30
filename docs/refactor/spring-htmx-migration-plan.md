@@ -44,14 +44,16 @@ src/main/java/{base}/
     config/          RestClient, 분석 스레드풀, 스케줄링 설정
     exception/       GlobalExceptionHandler, 사용자 문구 변환(toUserMessage)
     filter/          요청 로그
+    logging/         로그 마스킹(LogMembersCustomizer, SecretScrubber)
     util/            커밋 필터, 문자열 자르기
     github/          GitHub 클라이언트 (dto/, exception/, service/)
-    llm/             LLM 클라이언트 (dto/, exception/, service/)
+    llm/             LLM 클라이언트 (dto/, exception/, prompt/, service/)
     health/          /api/health
   analysis/
     controller/      메인 화면, POST /analyze, 진행 화면과 progress 조각
     dto/request/
     dto/response/
+    exception/       StarRequiredException
     entity/          AnalysisJob, Repo, RepoAnalysis
     enums/           AnalysisJobStatus, RepoStatus
     repository/      AnalysisJobRepository, RepoRepository, RepoAnalysisRepository
@@ -71,6 +73,8 @@ src/main/resources/
   templates/         analysis/, report/, error/
   static/            js/(htmx, 리포트 화면 스크립트), css/
 src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/, service/, repository/)
+src/test/resources/
+  golden/prompts/    Node 앱이 만든 프롬프트 출력 (S-3)
 ```
 
 - 도메인 사이의 호출은 Service끼리만 한다. 예를 들어 분석 파이프라인은 프로필 종합을 `report`의 Service에 맡긴다.
@@ -81,12 +85,12 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 
 | # | 질문 | 추천 |
 |---|---|---|
-| Q1 | 코드를 어디서 개발하나 | 결정: 별도 워크트리에서 브랜치 `refactor/spring-migration`으로 개발한다. 메인 저장소는 `main`에 두고 운영 중인 Node 앱을 고치는 데 쓴다. Spring 프로젝트는 `server/` 디렉터리에 만들고 전환 커밋(S-7)에서 Node 코드를 지우고 루트로 올린다 |
-| Q2 | Java 버전 | 25 (최신 LTS). 라이브러리 호환 문제가 생기면 21로 내린다 |
-| Q3 | 전환할 때 몇 분 정도 서비스가 멈춰도 되나 | 된다고 가정했다. 안 된다면 S-7 절차를 다시 짠다 |
-| Q4 | 프로필 리포트 재사용 조건을 그대로 둘까 | 그대로 둔다. S-2의 "동작 변화 주의" 참고 |
-| Q5 | 서버 메모리 여유 | 사용자가 SSH로 `free -h`를 확인한다. JVM 한 개에 힙 512MB 안팎이면 충분할 것으로 본다 |
-| Q6 | 최상위 패키지 이름(`{base}`) | `pinnedsignal`. DB 스키마 이름과 같다 |
+| Q1 | 코드를 어디서 개발하나 | 결정: 별도 워크트리에서 브랜치 `refactor/spring-migration`으로 개발한다. 메인 저장소는 `main`에 두고 운영 중인 Node 앱을 고치는 데 쓴다. Spring 프로젝트는 `server/` 디렉터리에 만든다. 전환(S-7)에서는 `server/`를 그대로 두고 배포 설정만 바꾼다. Node 코드 삭제와 루트 이동은 S-8에서 한다 |
+| Q2 | Java 버전 | 결정: 25. Spring Boot 4.1.2, Hibernate 7.4, Lombok 1.18.48과 함께 빌드와 테스트가 문제없이 돈다 |
+| Q3 | 전환할 때 몇 분 정도 서비스가 멈춰도 되나 | 결정: 된다고 보고 진행한다. 안 된다면 S-7 절차를 다시 짠다 |
+| Q4 | 프로필 리포트 재사용 조건을 그대로 둘까 | 결정: 그대로 둔다. S-4에서 이전 작업의 저장소를 `status = COMPLETED`로 걸러 지문을 만든다(S-2 "동작 변화 주의") |
+| Q5 | 서버 메모리 여유 | 결정: 서버 메모리는 3.7GiB이고 Node 앱이 도는 지금 여유(available)가 2.4GiB다. compose `mem_limit: 1g`, `-XX:MaxRAMPercentage=70`(힙 약 700MB)으로 둔다 |
+| Q6 | 최상위 패키지 이름(`{base}`) | 결정: `pinnedsignal`. DB 스키마 이름과 같다 |
 
 ## 진행 방식
 
@@ -95,15 +99,15 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 
 | # | 작업 | 예상 | 상태 |
 |---|---|---|---|
-| S-0 | 기존 동작 목록 정리, 결정 확정 | 0.5일 | 대기 (Q2~Q6) |
-| S-1 | Spring 프로젝트 골격 | 1일 | 대기 |
-| S-2 | DB 계층과 스키마 변경 | 1.5일 | 대기 |
-| S-3 | GitHub·LLM 클라이언트, 프롬프트, 응답 검증 | 2~3일 | 대기 |
-| S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 대기 |
-| S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 대기 |
-| S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 대기 |
-| S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 대기 |
-| S-8 | Node 코드 제거, 문서 갱신 | 0.5일 | 대기 |
+| S-0 | 기존 동작 목록 정리, 결정 확정 | 0.5일 | 완료 (Q5는 S-7 전에 사용자가 확인) |
+| S-1 | Spring 프로젝트 골격 | 1일 | 완료 `2580d75` |
+| S-2 | DB 계층과 스키마 변경 | 1.5일 | 완료 `c2e9652` |
+| S-3 | GitHub·LLM 클라이언트, 프롬프트, 응답 검증 | 2~3일 | 완료 `d1cbb7a` |
+| S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 완료 `9a60ec2` |
+| S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 완료 `ae03a82` |
+| S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 완료 |
+| S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 진행 중 (배포 설정 완료, 운영 전환 대기) |
+| S-8 | Node 코드 제거, 루트로 이동, 문서 갱신 | 0.5일 | 대기 |
 
 합계는 약 2.5~3주다. 가장 큰 위험은 S-4의 파이프라인 동작(재사용 규칙, 타임아웃, 실패 처리)을 지금과 똑같이 맞추는 일이다.
 
@@ -113,6 +117,7 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 
 - Jest 테스트 300개에서 "지켜야 하는 동작"을 뽑아 이 문서 끝의 [동작 체크리스트](#동작-체크리스트)를 채운다. 테스트를 1:1로 옮기지 않고 이 목록을 기준으로 새로 쓴다.
 - Q2~Q6을 정한다.
+- **결과**: Jest 테스트 제목과 본문을 보고 동작 체크리스트를 채웠다. 대상이 사라지는 테스트(SSE, Redis 락, BullMQ, PDF, Next 빌드)는 체크리스트에 넣지 않았다. S-3에서 확인한 항목에는 표시를 했다.
 
 ## S-1. Spring 프로젝트 골격
 
@@ -126,6 +131,14 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
   - 비밀값 마스킹(필드 경로 `redact`와 `scrubSecrets` 패턴)을 옮긴다. 원본은 [lib/logger.ts](../../lib/logger.ts)다.
   - LLM 프롬프트와 원본 응답은 남기지 않는다.
 - **확인**: `./gradlew bootRun`으로 빈 페이지가 뜨고 Tailwind 클래스가 적용된다.
+- **결과** (`2580d75`)
+  - Spring Boot 4부터 스타터가 기능별로 나뉘었다. 계획의 `-web` 대신 `spring-boot-starter-webmvc`를 쓰고, Flyway 자동 설정은 `spring-boot-starter-flyway`, `RestClient.Builder`는 `spring-boot-starter-restclient`(S-3에서 추가)가 있어야 생긴다.
+  - 로그는 Spring Boot 내장 `logstash` 형식으로 쓴다. 처음에는 pino와 같은 필드 이름을 맞추려고 직접 만든 포매터(`PinoJsonFormatter`)를 썼는데, 내장 형식으로 충분해서 지웠다. 필드는 SLF4J fluent API의 `addKeyValue`나 MDC로 넘기고 예외는 `setCause`로 넘긴다. `LogMembersCustomizer`를 `logging.structured.json.customizer`로 꽂아 `LoggableException`의 필드(`statusCode`, `endpoint` 등)를 `err` 아래에 남기고 필드 이름 마스킹과 `SecretScrubber`로 비밀값을 지운다. 마스킹은 `message`와 `stack_trace`를 포함해 모든 문자열에 적용된다.
+  - 필드 이름이 pino와 달라진다. `time`은 `@timestamp`(시간대 오프셋 포함), `msg`는 `message`가 되고 `level`은 이름은 같지만 값이 대문자(`INFO`)다. 예외는 `err.type`·`message`·`stack` 대신 `stack_trace` 문자열로 나온다. `event`와 직접 넘긴 필드는 최상위에 그대로 남는다. 그래서 운영 전환 전에 수집기 설정의 `level` 레이블 값과 Grafana 쿼리의 `level="error"` 같은 조건을 `ERROR`에 맞춰 고쳐야 한다.
+  - 필수 환경 변수는 `@Validated` 설정 record로 받는다. 비어 있으면 Node 앱과 같은 문구(`GITHUB_TOKEN environment variable is not set`)로 부팅이 멈춘다.
+  - Tailwind는 Gradle 작업이 standalone CLI(4.3.3)를 `server/.tailwind/`에 내려받아 빌드한다. HTMX는 `static/js/htmx-2.0.11.min.js`로 넣었다.
+  - 로컬 Postgres 컨테이너에 붙여 `./gradlew bootRun`을 실행해 메인 화면과 Tailwind 클래스를 확인했다.
+  - `application-prod.yml`과 요청 로그 필터는 아직 만들지 않았다. 지금 쓸 설정이 없고 Node 앱에도 요청 로그가 없어서 필요해지는 S-5·S-7에서 만든다.
 
 ## S-2. DB 계층과 스키마 변경
 
@@ -149,6 +162,18 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
     ADD COLUMN position int NOT NULL DEFAULT 0,
     ADD COLUMN error_message text;
 
+  -- 같은 프로필에 진행 중인 작업이 여럿이면 가장 최근 것만 남기고 FAILED로 끝낸다.
+  UPDATE analysis_jobs
+  SET status = 'FAILED', error_message = '서버 재시작으로 분석이 중단되었습니다', updated_at = now() AT TIME ZONE 'UTC'
+  WHERE id IN (
+    SELECT id FROM (
+      SELECT id, row_number() OVER (PARTITION BY github_profile ORDER BY created_at DESC, id DESC) AS rn
+      FROM analysis_jobs
+      WHERE status IN ('PENDING', 'PROCESSING')
+    ) ranked
+    WHERE rn > 1
+  );
+
   -- 같은 프로필의 진행 중인 작업은 하나만 존재한다. Redis 락을 대신한다.
   CREATE UNIQUE INDEX analysis_jobs_active_profile_key
     ON analysis_jobs (github_profile)
@@ -159,7 +184,7 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
     ON analysis_jobs (created_at)
     WHERE status = 'PENDING';
   ```
-- **V2 적용 전 확인**: 지금 DB에 `PENDING`/`PROCESSING`으로 멈춘 작업이 같은 프로필에 두 개 이상 있으면 unique index 생성이 실패한다. S-7에서 미리 조회해 `FAILED`로 정리한다.
+- **같은 프로필의 진행 중 작업 정리**: 지금 DB에 `PENDING`/`PROCESSING`으로 멈춘 작업이 같은 프로필에 두 개 이상 있으면 unique index 생성이 실패한다. 그래서 V2가 인덱스를 만들기 전에 프로필마다 가장 최근 작업만 남기고 나머지를 `FAILED`로 바꾼다. 남긴 작업이 `PROCESSING`이면 앱이 뜰 때 재시작 복구(S-4)가 `FAILED`로 바꾸고 `PENDING`이면 큐가 실행한다.
 - V2는 기존 Node 앱과도 호환된다. Node 앱은 `status`를 넣지 않으므로 기본값 `COMPLETED`가 들어가고, 이는 지금 의미(분석이 끝난 저장소만 행이 있음)와 같다. 그래서 전환 후 롤백할 때 DB를 되돌릴 필요가 없다.
 
 ### 저장소 행을 미리 만든다
@@ -170,6 +195,12 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 - **동작 변화 주의 (Q4)**: 리포트 재사용 판단에 쓰는 지문 `buildProfileFingerprint(previousJob.repositories)`([orchestrator.ts:150](../../services/analysis/orchestrator.ts))는 지금 "분석을 마친 저장소"만으로 만들어진다. 저장소 행을 전부 남기면 건너뛴 저장소까지 지문에 들어가 재사용 조건이 달라진다. 지금과 같게 하려면 이전 작업의 저장소를 `status = COMPLETED`로 걸러서 지문을 만든다. 저장소별 이전 분석 재사용(`previousAnalyses`)은 분석 행이 있는지 이미 확인하므로 그대로 둔다.
 
 - **확인**: Testcontainers Postgres에서 V1 → V2가 적용되고, 엔티티로 읽고 쓸 때 배열·JSON·enum이 왕복된다.
+- **결과** (`c2e9652`)
+  - V1은 `prisma migrate diff --from-empty`로 만든 DDL이다. `pg_dump` 대신 이 방법을 쓰고 운영 DB의 `information_schema`·`pg_indexes`·`pg_constraint`와 읽기 전용으로 대조해 컬럼, 기본값, 인덱스, 외래 키가 모두 같음을 확인했다. 운영 DB는 PostgreSQL 17.6이라 Testcontainers도 `postgres:17-alpine`을 쓴다.
+  - 시각 컬럼은 `timestamp(3)`(시간대 없음)에 Prisma가 UTC로 넣은 값이다. `Instant`로 매핑하고 `hibernate.type.preferred_instant_jdbc_type=TIMESTAMP`, `hibernate.jdbc.time_zone=UTC`를 켰다. Node 앱이 넣은 형태의 행을 SQL로 넣고 같은 시각으로 읽히는지 테스트한다.
+  - `status`는 `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`으로 매핑했다. 계획에 적은 `PostgreSQLEnumJdbcType`과 같은 일을 하는 Hibernate 7의 방식이다.
+  - 새 ID는 `@UuidGenerator`로 만든다. 엔티티 사이의 컬렉션(`@OneToMany`)은 두지 않고 Repository 조회 메서드로 대신한다.
+  - 테스트: V1 → V2 적용, `ddl-auto=validate`로 엔티티와 스키마 일치, 배열·JSON·enum·시각 왕복, 같은 프로필의 진행 중 작업 두 개 거부, 끝난 작업이 있으면 새 작업 허용.
 
 ## S-3. GitHub·LLM 클라이언트, 프롬프트, 응답 검증
 
@@ -184,6 +215,14 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 - **커밋 필터** ([lib/commit-filter.ts](../../lib/commit-filter.ts)): Java 정규식으로 옮긴다. `\b` 동작이 JS와 같은지 [tests/lib/commit-filter.test.ts](../../tests/lib/commit-filter.test.ts)의 사례로 확인한다.
 - **에러 문구** ([lib/errors.ts](../../lib/errors.ts)의 `toUserMessage`): 사용자에게 보이는 문구를 그대로 옮긴다. 내부 에러 메시지는 화면에 보내지 않는다(O-4).
 - **확인**: WireMock으로 GitHub·LLM 응답을 흉내 내 재시도, 오류 분류, JSON 검증 실패를 테스트한다.
+- **결과** (`d1cbb7a`)
+  - GitHub 클라이언트는 `RestClient.exchange`로 상태 코드와 헤더를 직접 보고 재시도 규칙(500·502·503, 남은 한도 0인 403, 최대 3회, 100·200·400ms)을 그대로 옮겼다. 재시도 대기는 `Sleeper`로 분리해 테스트에서 실제로 기다리지 않는다. 대기 중 인터럽트되면 작업을 멈춘다(S-4 타임아웃에서 쓴다).
+  - LLM 클라이언트는 `openai-java` 4.94.0을 쓴다. `max_tokens`는 SDK에서 deprecated지만 지금처럼 그대로 보낸다. OpenAI 호환 업체 중 `max_completion_tokens`를 모르는 곳이 있기 때문이다. SDK 오류는 지금처럼 상태 코드 유지, 타임아웃 408, 연결 실패 503으로 바꾼다.
+  - 응답 검증은 Jackson 기본 동작이 zod보다 느슨해서 따로 맞췄다. Jackson은 숫자를 문자열로, `"0.5"`를 숫자로 바꿔 받는데 zod는 거부한다. LLM 응답용 `JsonMapper`에서 이 타입 변환을 막고 뒤에 붙은 내용도 거부하게 했다.
+  - 프롬프트는 고정 문구를 `resources/prompts/*.txt`에 두고 `{{userPrompt}}` 자리에 사용자 입력 부분을 넣는다. 같은 입력으로 Node 코드가 만든 출력을 골든 파일(`test/resources/golden/prompts/`)로 저장해 두고 바이트 단위로 비교한다.
+  - 커밋 필터는 JS와 Java 정규식이 다른 두 곳을 맞췄다. JS의 `$`는 끝 줄바꿈 앞에서 맞지 않으므로 `\z`로 쓰고, JS의 `\s`는 유니코드 공백을 포함하므로 같은 범위의 문자 클래스로 바꿨다. `\b`는 Java 19부터 JS처럼 ASCII 기준이라 그대로 둔다. 한글이 붙은 경우(`merge한`, `docs수정`)는 Node에서 결과를 확인하고 테스트에 넣었다.
+  - 계획과 달라진 점: `schemas/github-url-request.ts`와 `normalizeGitHubUrl`은 분석 요청 화면에서만 쓰므로 S-5로 넘긴다. GitHub 요청에는 지금처럼 타임아웃을 두지 않았다. S-4에서 인터럽트로 끊기는지 확인할 때 함께 정한다.
+  - 테스트는 157개이고 모두 통과한다.
 
 ## S-4. 분석 파이프라인과 DB 큐
 
@@ -227,6 +266,19 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 - **타임아웃** (10분, `ANALYSIS_TIMEOUT_MS`): 작업을 `Future`로 돌리고 `get(timeout)`이 넘으면 취소 플래그를 세운다. 저장소 루프가 매 반복마다 플래그를 확인한다. 지금의 `timedOut` 변수와 같은 방식이다. "타임아웃 뒤에도 작업이 계속 실행됨" 문제는 `Future.cancel(true)`의 인터럽트로 블로킹 HTTP 호출까지 끊을 수 있는지 함께 확인한다.
 - **위젯 SVG** ([services/widget-export.ts](../../services/widget-export.ts)): Java text block으로 옮긴다. XML 이스케이프, 줄바꿈 길이, 최대 줄 수 규칙을 그대로 둔다. 기존 저장값과 새로 만든 SVG를 바이트 단위로 비교하는 테스트를 둔다.
 - **확인**: Testcontainers Postgres와 가짜 GitHub·LLM 클라이언트로 정상, 재사용, 저장소 일부 실패, 전체 실패, 타임아웃, 재시작 복구를 테스트한다. 같은 프로필 작업이 동시에 두 개 실행되지 않는지도 확인한다.
+- **결과** (`9a60ec2`)
+  - 큐 SQL은 계획대로 `UPDATE … WHERE id = (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id`다. `updated_at`은 `timestamp(3)`(시간대 없음)에 UTC로 넣어야 해서 `now()` 대신 `now() AT TIME ZONE 'UTC'`를 쓴다. 다른 트랜잭션이 잡고 있는 작업을 건너뛰는지는 테스트로 확인했다.
+  - 폴러는 1초마다 돌면서 빈 슬롯이 있는 동안 작업을 하나씩 집는다. 슬롯은 `Semaphore`(3개)로 센다. 실행기와 타임아웃 감시기는 `AnalysisJobRunner`가 직접 만든다. 감시기를 빈으로 두면 Spring Boot의 기본 스케줄러가 물러나 폴러가 감시기와 스레드를 나눠 쓰게 되기 때문이다.
+  - 재시작 복구는 `SmartInitializingSingleton`으로 한다. 스케줄러는 컨텍스트 초기화가 끝난 뒤에 시작하므로 복구가 폴러보다 먼저 끝난다. `ApplicationReadyEvent`로 하면 폴러가 방금 집은 작업을 복구가 FAILED로 바꿀 수 있다.
+  - 타임아웃은 계획과 조금 다르다. 작업마다 `Future.get(timeout)`으로 기다리는 스레드를 두는 대신, 감시 스레드 하나가 10분 뒤 취소 플래그를 세우고 `Future.cancel(true)`로 작업 스레드를 인터럽트한다. 파이프라인은 저장소 사이, 프로필 종합 전, 완료 기록 전에 플래그를 보고 FAILED로 끝낸다. 인터럽트 플래그가 남아 있으면 Hikari가 연결을 주지 않으므로 FAILED를 쓰기 전에 플래그를 지운다.
+  - **인터럽트 확인 결과**: GitHub 호출(JDK HttpClient)은 인터럽트로 바로 끊긴다. 그래서 GitHub 요청에 타임아웃을 따로 두지 않았다. LLM 호출(OkHttp)은 인터럽트로 끊기지 않는다. 호출 하나는 요청 타임아웃 120초에 끝나지만 SDK 재시도 2회까지 더하면 최대 6분쯤 걸린다. 그동안은 슬롯도 비지 않으므로 10분을 넘긴 작업이 FAILED가 되는 시점이 최대 6분 늦어질 수 있다.
+  - 저장소 분석은 pinned 목록에서 받은 메타데이터를 그대로 쓴다. 지금은 저장소마다 사용자 저장소 목록을 다시 받는데 미리 만든 `repositories` 행에 이미 같은 값이 있어서 이 요청을 뺐다.
+  - 건너뛴 저장소는 `error_message` 없이 `SKIPPED`만 남긴다. 화면에 보일 문구는 S-5에서 정한다.
+  - 재사용 지문은 계획대로 이전 작업의 `COMPLETED` 저장소만으로 만든다. 이전에 건너뛴 저장소가 있으면 리포트는 새로 만들고 분석이 있는 저장소의 분석은 재사용한다. 프로필 종합에 넘기는 저장소도 `COMPLETED`만이다.
+  - 진행 상태 기록은 `AnalysisProgressService`의 짧은 트랜잭션으로 나눴다. 화면이 polling하므로 파이프라인 전체를 한 트랜잭션으로 묶지 않는다. `RepoAnalysis` 삭제는 파생 메서드 대신 벌크 `@Query`로 둔다. 파생 삭제는 flush가 늦어져 `repositories`를 먼저 지울 때 외래 키에 걸렸다.
+  - 위젯 SVG는 Node가 만든 출력을 골든 파일로 저장해 바이트 단위로 비교한다. 입력 4건(일반, 빈 값, 특수문자, 공백·마침표 경계)을 `cases.json`에 두고 `services/widget-export.ts`로 출력을 만들었다. JS의 `\s`와 `trim`에 맞추려고 `TextUtils`에 `JS_WHITESPACE`, `collapseWhitespace`, `splitWords`를 두었고 `CommitFilter`도 이 상수를 쓴다.
+  - 같은 프로필 작업이 동시에 두 개 실행되지 않는 것은 S-2의 partial unique index 테스트가 확인한다. 컨텍스트를 띄우는 테스트는 `analysis.polling.enabled=false`로 폴러를 끈다.
+  - 테스트는 191개이고 모두 통과한다.
 
 ## S-5. 화면과 엔드포인트
 
@@ -280,12 +332,31 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 - `app/error.tsx`, `app/not-found.tsx`, `app/analysis/[jobId]/error.tsx`를 `templates/error/404.html`, `5xx.html`로 옮긴다.
 
 - **확인**: MockMvc로 각 엔드포인트의 상태 코드, `HX-Redirect`, 286, 조각 내용을 테스트한다. 브라우저에서 메인 → star 안내 → 진행 → 리포트 → 위젯 복사까지 한 번 직접 확인한다.
+- **결과** (`ae03a82`)
+  - 엔드포인트는 위 표대로 만들었다. 분석 요청은 `AnalyzeController`, 진행 화면은 `AnalysisProgressController`, 리포트와 위젯은 `report` 도메인 컨트롤러가 맡는다. 화면이 읽는 쪽은 `AnalysisQueryService`로 두어 상태를 쓰는 `AnalysisProgressService`와 나눴다. `report`는 `analysis`의 Repository를 직접 부르지 않고 이 서비스를 거친다.
+  - 오류 조각은 `htmx-config`의 `responseHandling`으로 4xx·5xx도 화면에 넣게 해서 상태 코드(400, 403, 404, 429, 502, 500)를 그대로 보낸다. 다만 polling 요소는 `hx-on::before-swap`으로 5xx 응답을 무시하고 다음 주기에 다시 요청한다. DB가 잠깐 끊겨도 진행 화면이 오류 페이지로 바뀌지 않는다.
+  - 중복 방지는 `INSERT`가 partial unique index에 걸리면 진행 중인 작업을 조회하는 방식이다. 같은 프로필을 동시에 두 번 요청하는 테스트로 작업이 하나만 생기는 것을 확인했다.
+  - star 안내의 "검증 후 분석" 버튼과 실패 화면의 "다시 시도" 버튼은 프로필 URL을 hidden 입력으로 들고 `/analyze`를 다시 부른다. 그래서 "다시 시도"는 6단계(수동 재시도)를 기다리지 않고 새 `PENDING` 작업을 만든다. 안내를 보고 다시 눌렀는데 또 star가 없으면 `confirm=true` 파라미터를 보고 "아직 star가 확인되지 않았습니다" 문구를 더한다.
+  - 입력 검증 문구는 Node 클라이언트 화면에 있던 "GitHub 프로필 URL을 입력해주세요", "올바른 GitHub 프로필 URL을 입력해주세요"를 쓴다. 정규화는 `GitHubUrls`로 옮겼고 `tests/lib/utils.test.ts`의 사례를 포함한다. 프로필 없음, rate limit, 토큰 권한(502, `api.error` 로그), 내부 오류는 Node 앱과 같은 문구다.
+  - 진행 화면의 첫 응답과 polling 응답은 같은 조각 템플릿이다. 건너뛴 저장소에는 "분석할 커밋이 없어 건너뛰었습니다."를 보여준다. 이미 끝난 작업의 `/analysis/{jobId}`는 리포트로 302 이동하고 조각 요청은 `HX-Redirect`를 보낸다.
+  - 리포트의 "Pin된 저장소" 카드에는 분석이 끝난(`COMPLETED`) 저장소만 나온다. 지금 화면과 같다. 위젯 대화상자는 네이티브 `<dialog>`이고 강점 더 보기·테마 전환·복사는 `report.js` 하나가 맡는다.
+  - 위젯은 저장된 SVG가 현재 버전(`inner-card-v4`)이면 그대로 쓰고 아니면 다시 만들어 저장한다. 경로, `theme` 파라미터, `Cache-Control`은 같다. `Content-Type`은 Tomcat이 `;` 뒤 공백을 지워서 `image/svg+xml;charset=utf-8`로 나간다. 미디어 타입은 같아서 그대로 뒀다.
+  - `/api/health`는 DB 쿼리와 폴러의 마지막 poll 시각(60초 안)을 본다. 확인마다 3초 제한이 있고 하나라도 실패하면 503이다. 폴러는 큐가 비어 있어도 매 주기에 시각을 갱신한다.
+  - 오류 화면은 `GlobalExceptionHandler`가 `error/404`, `error/5xx`로 보낸다. 400이나 405 같은 요청 오류는 Spring이 원래 상태 코드로 처리하도록 넘긴다. 5xx 화면의 "Try Again" 버튼은 새로고침 대신 메인 화면 링크로 바꿨다. `favicon.ico`는 `app/`에서 `static/`으로 복사했다.
+  - 계획과 달라진 점: `analysis/exception/`(`StarRequiredException`)을 디렉터리 구조에 더했다.
+  - **브라우저 확인**: 가짜 GitHub·LLM 서버와 Postgres 컨테이너에 앱을 붙여 메인 → star 안내 → "아직 star가 확인되지 않았습니다" → star 후 재검증 → 진행(polling) → 리포트 자동 이동 → 위젯 대화상자(테마 전환, 미리보기, 복사)까지 확인했다. 이 과정에서 "검증 후 분석" 버튼의 로딩 표시가 안 보이는 문제를 찾아 고쳤다.
+  - 테스트는 293개이고 모두 통과한다. 컨트롤러는 MockMvc 슬라이스 테스트로, 서비스는 Testcontainers로 확인했고 `AnalysisWebFlowTest`가 요청 → 큐 → 진행 → 리포트 → 위젯을 실제 컨텍스트에서 한 번에 훑는다.
 
 ## S-6. 테스트
 
 - 도구: JUnit 5, AssertJ, Mockito, Testcontainers(Postgres), WireMock(GitHub·LLM HTTP), MockMvc.
 - GitHub Actions의 ubuntu 러너에는 Docker가 있으므로 Testcontainers가 돈다.
 - 기존 Jest 테스트를 줄 단위로 옮기지 않고 [동작 체크리스트](#동작-체크리스트)를 기준으로 쓴다. SSE 관련(`sse.test.ts`, `sse-snapshot.test.ts`), Redis·큐 관련(`cache.test.ts`, `queue.test.ts`, `analysis-worker.test.ts`), PDF(`pdf-export.test.ts`), Next 빌드 확인(`infrastructure/setup.test.ts`)은 대상이 사라지므로 옮기지 않는다. polling 조각과 DB 큐 테스트를 새로 쓴다.
+- **결과**
+  - S-1~S-5에서 도구(JUnit 5, AssertJ, Mockito, Testcontainers, WireMock, MockMvc)와 테스트가 이미 갖춰져서 S-6에서 새로 쓴 테스트는 없다. 대신 [동작 체크리스트](#동작-체크리스트)의 모든 항목에 대응하는 테스트가 있는지 하나씩 대조했고 빠진 항목은 없었다.
+  - 대조한 결과는 이렇다. 분석 요청은 `AnalyzeControllerTest`와 `AnalysisRequestServiceTest`, 파이프라인은 `AnalysisPipelineServiceTest`, `AnalysisJobRunnerTest`, `AnalysisQueueServiceTest`가 맡는다. 조회는 `AnalysisProgressControllerTest`, `ReportControllerTest`, `WidgetControllerTest`, `HealthControllerTest`, 클라이언트 로직과 로그는 `GitHubClientTest`, `LlmClientTest`, `CommitFilterTest`, `PinoJsonFormatterTest`, `SecretScrubberTest`가 맡는다.
+  - 캐시를 쓰지 않고 `./gradlew cleanTest test`로 다시 돌렸더니 293개가 모두 통과했다(실패 0, 건너뜀 0). Testcontainers가 Docker를 쓰므로 로컬에서도 Docker가 떠 있어야 하고 빌드는 JDK 25 툴체인으로 돈다.
+  - 대상이 사라지는 Jest 테스트(SSE, Redis·큐, PDF, Next 빌드)는 계획대로 옮기지 않았다. CI의 test 잡을 `./gradlew test`로 바꾸는 일은 S-7에서 한다.
 
 ## S-7. 배포 파이프라인 교체와 운영 전환
 
@@ -295,23 +366,41 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 - **JVM 메모리**: `-XX:MaxRAMPercentage`로 힙 상한을 잡고, compose에 `mem_limit`를 둔다. 값은 Q5 결과로 정한다.
 - **CI** ([deploy.yml](../../.github/workflows/deploy.yml)): test 잡을 `setup-java` + `./gradlew test`로 바꾼다. build·deploy 잡은 그대로 둔다(ARM 러너, GHCR, Tailscale SSH).
 - **compose**: 서비스는 `app` 하나만 남긴다. `worker`, `redis`, `redis_data` 볼륨을 지운다. 로그 로테이션과 `restart: unless-stopped`는 유지한다. 컨테이너 이름이 바뀌면 Alloy 수집 설정(O-5)도 함께 맞춘다. 파일은 `deploy/docker-compose.yml`로 옮기고 배포 스크립트의 `docker compose` 명령에 `-f deploy/docker-compose.yml`을 준다.
+- **결과** (배포 설정)
+  - `server/Dockerfile`은 `eclipse-temurin:25-jdk`에서 `./gradlew bootJar`로 jar를 만들고 `eclipse-temurin:25-jre`에서 `app` 사용자로 실행한다. Tailwind standalone CLI가 glibc 바이너리라서 alpine 이미지는 쓰지 않는다. CLI는 Gradle 작업이 빌드 중에 내려받는다. 빌드 컨텍스트가 `server/`로 바뀌어 루트의 Node용 `Dockerfile`과 `.dockerignore`는 지웠다.
+  - 메모리는 Q5에 따라 `mem_limit: 1g`, `-XX:MaxRAMPercentage=70`으로 두었다. 로컬에서 768MB 한도로 띄웠을 때 기동 직후 컨테이너 메모리는 약 400MB였다. 전환하면 Node 앱, 워커, Redis가 빠지므로 서버의 여유 메모리는 지금보다 늘어난다.
+  - 컨테이너 안에서는 Spring 기본 포트 8080으로 듣고 compose가 `3000:8080`으로 연결한다. 바깥 포트가 그대로라 리버스 프록시 설정은 바꾸지 않는다.
+  - compose 파일을 `deploy/`로 옮기면 Compose가 `deploy/`를 프로젝트 디렉터리로 본다. 그러면 프로젝트 이름이 `deploy`가 되고 루트의 `.env`도 읽지 않는다. 그래서 배포 스크립트는 `docker compose --project-directory . -f deploy/docker-compose.yml`로 실행한다. 서버에서 compose 명령을 직접 칠 때도 같은 옵션을 줘야 한다.
+  - 서비스 이름이 `next-app`에서 `app`으로 바뀌면 예전 `next-app` 컨테이너가 3000번 포트를 쥔 채 남아 새 컨테이너가 뜨지 못한다. 그래서 배포 스크립트의 `up -d`에 `--remove-orphans`를 붙였다. 첫 배포 때 `worker`와 `redis` 컨테이너도 함께 지워지고 `redis_data` 볼륨은 남는다.
+  - CI test 잡은 `setup-java`(Temurin 25)와 `gradle/actions/setup-gradle`로 `server/`에서 `./gradlew test`를 돌린다. build 잡은 컨텍스트만 `server`로 바꿨다.
+  - 확인: 이미지를 로컬에서 빌드하고 로컬 Postgres에 붙여 띄웠다. `/api/health`는 200(`database`, `poller` 모두 ok), 메인 화면과 `/css/app.css`도 200이었고 로그는 모두 JSON 한 줄이었다. `./gradlew test`는 296개가 모두 통과한다.
+  - 계획에서는 전환 전에 멈춘 작업을 손으로 정리하기로 했는데 이 정리를 V2에 넣었다. 정리를 빠뜨리면 V2가 실패해 앱이 뜨지 않기 때문이다. `PollingAndQueueMigrationTest`는 V1까지 적용한 DB에 Node 앱이 남긴 형태의 중복 작업을 넣고 V2를 적용해 오래된 작업만 `FAILED`가 되는지 확인한다. V2가 이미 적용된 로컬 DB는 checksum이 달라지므로 다시 만들거나 `flyway repair`를 한다.
+  - 수집기(O-5)는 아직 없어서 `level` 값이나 컨테이너 이름에 맞춰 고칠 설정도 없다. O-5를 할 때 `level` 값이 `ERROR`처럼 대문자이고 컨테이너 이름이 `github_repo_analysis-app-1`이라는 점을 반영한다.
 
 ### 전환 절차
 
-1. 서버 `.env`에 `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD`를 추가한다(S-1). 기존 변수는 롤백을 위해 남겨 둔다.
-2. 운영 DB에서 같은 프로필에 진행 중인 작업이 여럿인지 조회하고, 멈춘 `PENDING`/`PROCESSING` 작업을 `FAILED`로 정리한다(V2의 unique index 생성 조건).
+1. 서버 `.env`(저장소 루트)에 `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD`를 추가한다(S-1). URL은 기존 `DATABASE_URL`의 호스트, 포트, DB 이름으로 `jdbc:postgresql://{host}:{port}/{db}?currentSchema=pinnedsignal`처럼 만들고 사용자와 비밀번호는 따로 넣는다. 기존 변수는 롤백을 위해 남겨 둔다.
+2. 손으로 정리할 작업은 없다. 같은 프로필에 진행 중인 작업이 여럿이면 V2가 인덱스를 만들기 전에 정리한다(S-2). 머지 전에 어떤 작업이 바뀔지 보고 싶으면 아래 쿼리를 돌린다.
+   ```sql
+   -- 나온 프로필마다 가장 최근 작업만 남고 나머지는 FAILED가 된다.
+   SELECT github_profile, count(*) FROM pinnedsignal.analysis_jobs
+   WHERE status IN ('PENDING', 'PROCESSING')
+   GROUP BY github_profile HAVING count(*) > 1;
+   ```
 3. `main`에 머지한다. 배포 워크플로가 새 이미지를 올리고 `docker compose up -d`를 실행한다. Spring이 뜨면서 Flyway V2가 적용된다.
 4. 확인: `/api/health`, 기존에 만들어진 `/report/{jobId}`와 `/api/widget/{jobId}?theme=dark` 몇 개, 새 분석 한 건(재사용 경로와 새 분석 경로 모두).
-5. 이상이 없으면 Redis 컨테이너와 볼륨을 지운다(`docker compose down`에서 빠진 서비스는 남아 있을 수 있다. `docker compose up -d --remove-orphans`).
+5. 이상이 없으면 Redis 볼륨을 지운다(`docker volume rm github_repo_analysis_redis_data`). Redis 컨테이너는 배포 스크립트의 `--remove-orphans`가 이미 지웠다.
 
 ### 롤백
 
 - 머지 커밋을 revert해 다시 배포한다. 이전 compose(Node 앱, 워커, Redis)와 이미지가 돌아온다.
+- 되돌린 워크플로는 `--remove-orphans` 없이 `docker compose up -d`를 실행한다. 그러면 Spring `app` 컨테이너가 3000번 포트를 쥔 채 남아 `next-app`이 뜨지 못하므로, 되돌린 커밋을 배포하기 전에 서버에서 `docker compose --project-directory . -f deploy/docker-compose.yml down`으로 Spring 컨테이너를 내린다.
 - V2 스키마 변경은 Node 앱과 호환되므로 DB는 되돌리지 않는다(S-2).
 
 ## S-8. Node 코드 제거, 문서 갱신
 
 - Node 관련 파일을 지운다: `app/`, `components/`, `lib/`, `services/`, `prompts/`, `schemas/`, `workers/`, `types/`, `tests/`, `prisma/`, `package*.json`, `tsconfig*`, `next.config.ts`, `jest.config.js`, `eslint.config.mjs`, `postcss.config.mjs`, `public/`의 Next 기본 아이콘.
+- `server/`의 내용을 루트로 올리고 CI의 `working-directory`와 build 컨텍스트를 루트 기준으로 고친다.
 - 문서를 현재 구조로 고친다: [ARCHITECTURE.md](../ARCHITECTURE.md)(3절 Background Job), [DEVELOPMENT.md](../DEVELOPMENT.md), [ROADMAP.md](../ROADMAP.md)("향후 변경 예정"의 SSE 항목), [docs/CLAUDE.md](../CLAUDE.md), [observability-plan.md](observability-plan.md)(pino·Redis 언급).
 - 6단계(수동 재시도)는 이 구조에서 "같은 프로필로 새 `PENDING` 작업 만들기"로 단순해진다. 마이그레이션이 끝난 뒤 진행한다.
 
@@ -322,31 +411,51 @@ src/test/java/{base}/  main과 같은 패키지 구조 (도메인별 controller/
 S-0에서 기존 테스트를 보고 채운다. 아래는 코드에서 확인한 항목이고, 빠진 것을 더한다.
 
 **분석 요청**
-- [ ] 잘못된 URL은 400, 없는 프로필은 404, star가 없으면 403과 안내 문구
-- [ ] GitHub rate limit은 429와 `Retry-After: 60`, 토큰 권한 문제는 502와 정해진 문구
-- [ ] 같은 프로필을 동시에 두 번 요청하면 작업은 하나만 생기고 둘 다 같은 jobId를 받는다
-- [ ] 끝난 작업이 있는 프로필을 다시 요청하면 새 작업이 생긴다
-- [ ] 내부 오류는 정해진 문구만 보내고 상세는 로그로 남긴다
+- [x] 잘못된 URL은 400, 없는 프로필은 404, star가 없으면 403과 안내 문구
+- [x] GitHub rate limit은 429와 `Retry-After: 60`, 토큰 권한 문제는 502와 정해진 문구
+- [x] 같은 프로필을 동시에 두 번 요청하면 작업은 하나만 생기고 둘 다 같은 jobId를 받는다
+- [x] 끝난 작업이 있는 프로필을 다시 요청하면 새 작업이 생긴다
+- [x] 내부 오류는 정해진 문구만 보내고 상세는 로그로 남긴다
+- [x] GitHub 5xx는 500과 정해진 문구, 대소문자와 상관없이 "rate limit"이 들어간 메시지(보조 한도 포함)는 429
+- [x] 큐 등록이나 DB 저장이 실패하면 다음 요청이 새 작업을 만들 수 있다 (DB 큐에서는 `INSERT` 하나라서 자연히 지켜진다)
 
 **파이프라인**
-- [ ] pinned 저장소 0개면 `FAILED`, 실패 처리는 한 번만
-- [ ] 저장소는 순서대로 하나씩 분석하고, 하나가 실패해도 나머지는 계속한다
-- [ ] 필터 후 커밋이 0개면 `SKIPPED`
-- [ ] `full_name`과 `updated_at`이 같은 저장소는 이전 분석을 재사용한다
-- [ ] 현재 pinned 목록에 없는 이전 저장소 행은 삭제한다
-- [ ] 지문이 같고 green/red flag가 있으면 프로필 리포트를 재사용한다
-- [ ] 프로필 종합이 실패하면 대체 리포트를 저장하지 않는다
-- [ ] 10분 타임아웃이면 `FAILED`이고 그 뒤 단계로 넘어가지 않는다
-- [ ] 동시에 실행되는 분석은 최대 3개
-- [ ] 재시작 시 `PROCESSING` 작업이 `FAILED`가 된다 (새 동작)
+- [x] pinned 저장소 0개면 `FAILED`, 실패 처리는 한 번만
+- [x] 저장소는 순서대로 하나씩 분석하고, 하나가 실패해도 나머지는 계속한다
+- [x] 필터 후 커밋이 0개면 `SKIPPED`
+- [x] `full_name`과 `updated_at`이 같은 저장소는 이전 분석을 재사용한다
+- [x] 현재 pinned 목록에 없는 이전 저장소 행은 삭제한다
+- [x] 지문이 같고 green/red flag가 있으면 프로필 리포트를 재사용한다
+- [x] 프로필 종합이 실패하면 대체 리포트를 저장하지 않는다
+- [x] 10분 타임아웃이면 `FAILED`이고 그 뒤 단계로 넘어가지 않는다
+- [x] 동시에 실행되는 분석은 최대 3개
+- [x] 재시작 시 `PROCESSING` 작업이 `FAILED`가 된다 (새 동작)
+- [x] README가 없으면(404) README 없이 분석한다. 다른 README 오류는 저장소 실패다
+- [x] 저장소 실패 문구는 `toUserMessage`로 바꿔 저장하고 원본은 `repo.failed` 로그에만 남긴다
+- [x] 저장소 행이 없거나 요약이 빈 분석만 있으면 "no eligible repositories"로 `FAILED`
+- [x] 이전 리포트에 green/red flag가 없으면 프로필 리포트를 새로 만든다
+- [x] 프로필 종합이 실패해도 LLM 원본 응답은 화면과 DB에 나가지 않는다
+- [x] 위젯 SVG는 표시 크기만 줄이고 원래 좌표계를 유지한다
 
 **조회**
-- [ ] `COMPLETED`가 아닌 작업의 리포트와 위젯은 404
-- [ ] 위젯은 저장된 SVG를 우선 쓰고, 없으면 만들어서 돌려준다. `theme` 파라미터와 `Cache-Control: public, max-age=300, stale-while-revalidate=86400` 유지
-- [ ] 진행 조각: 새로고침해도 같은 내용, 완료 시 리포트로 이동, 실패 시 286과 실패 문구
+- [x] `COMPLETED`가 아닌 작업의 리포트와 위젯은 404
+- [x] 위젯은 저장된 SVG를 우선 쓰고, 없으면 만들어서 돌려준다. `theme` 파라미터와 `Cache-Control: public, max-age=300, stale-while-revalidate=86400` 유지
+- [x] 진행 조각: 새로고침해도 같은 내용, 완료 시 리포트로 이동, 실패 시 286과 실패 문구
+- [x] `/api/health`는 DB가 응답하지 않거나 확인 하나가 제한 시간을 넘기면 503
 
 **클라이언트 로직**
-- [ ] 커밋 필터의 통과·제외 사례(`tests/lib/commit-filter.test.ts`)
-- [ ] LLM 응답 JSON 검증 실패, 재시도, 타임아웃
-- [ ] GitHub 호출 재시도와 오류 분류
-- [ ] 로그에 토큰·API 키가 남지 않는다
+- [x] 커밋 필터의 통과·제외 사례(`tests/lib/commit-filter.test.ts`)
+- [x] LLM 응답 JSON 검증 실패, 재시도, 타임아웃
+- [x] GitHub 호출 재시도와 오류 분류
+- [x] 로그에 토큰·API 키가 남지 않는다
+- [x] GitHub: `/users/{name}`의 404는 "Profile not found", 그 밖의 오류는 응답 본문의 `message`(없으면 `HTTP {status}`)
+- [x] GitHub: 500·502·503과 남은 한도가 0인 403만 재시도하고 재시도마다 `github.retry`, 남은 한도가 100 미만이면 `github.rate_limit_low`
+- [x] GitHub: GraphQL `errors`는 400으로 바로 실패, `data`가 없으면 500으로 재시도
+- [x] GitHub: star 확인은 100개씩 넘기며 `owner/repo`를 대소문자 무시하고 정확히 비교한다
+- [x] GitHub: 저장소 목록은 fork·archived·빈 저장소를 빼고 최대 50개, 커밋은 작성자 기준 최대 300개, README는 base64를 풀어 10KB로 자른다
+- [x] LLM: 요청 옵션(`temperature` 0.1, `max_tokens` 16384, `json_object`, user 메시지 하나)
+- [x] LLM: SDK 오류는 앱에서 다시 시도하지 않는다. HTTP 오류는 상태 코드 유지, 타임아웃 408, 연결 실패 503
+- [x] LLM: `llm.call`에 kind·model·finishReason·토큰 수, `llm.invalid_response`에는 응답 길이만 남긴다
+- [x] 프롬프트 문구가 Node 앱과 한 글자도 다르지 않다
+- [x] 로그: JSON 한 줄, `level` 문자열, ISO 시각, pid·hostname 없음, LLM 원본 응답은 길이만
+- [x] 로그: 토큰·API 키·비밀번호·프롬프트 필드는 가리고 에러 메시지와 스택에서 `ghp_`·`github_pat_`·`sk-`·`Bearer`·URL 비밀번호를 지운다

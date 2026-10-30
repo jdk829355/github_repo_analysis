@@ -105,7 +105,7 @@ src/test/resources/
 | S-3 | GitHub·LLM 클라이언트, 프롬프트, 응답 검증 | 2~3일 | 완료 `d1cbb7a` |
 | S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 완료 `9a60ec2` |
 | S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 완료 `ae03a82` |
-| S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 대기 |
+| S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 완료 |
 | S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 대기 |
 | S-8 | Node 코드 제거, 문서 갱신 | 0.5일 | 대기 |
 
@@ -339,6 +339,11 @@ src/test/resources/
 - 도구: JUnit 5, AssertJ, Mockito, Testcontainers(Postgres), WireMock(GitHub·LLM HTTP), MockMvc.
 - GitHub Actions의 ubuntu 러너에는 Docker가 있으므로 Testcontainers가 돈다.
 - 기존 Jest 테스트를 줄 단위로 옮기지 않고 [동작 체크리스트](#동작-체크리스트)를 기준으로 쓴다. SSE 관련(`sse.test.ts`, `sse-snapshot.test.ts`), Redis·큐 관련(`cache.test.ts`, `queue.test.ts`, `analysis-worker.test.ts`), PDF(`pdf-export.test.ts`), Next 빌드 확인(`infrastructure/setup.test.ts`)은 대상이 사라지므로 옮기지 않는다. polling 조각과 DB 큐 테스트를 새로 쓴다.
+- **결과**
+  - S-1~S-5에서 도구(JUnit 5, AssertJ, Mockito, Testcontainers, WireMock, MockMvc)와 테스트가 이미 갖춰져서 S-6에서 새로 쓴 테스트는 없다. 대신 [동작 체크리스트](#동작-체크리스트)의 모든 항목에 대응하는 테스트가 있는지 하나씩 대조했고 빠진 항목은 없었다.
+  - 대조한 결과는 이렇다. 분석 요청은 `AnalyzeControllerTest`와 `AnalysisRequestServiceTest`, 파이프라인은 `AnalysisPipelineServiceTest`, `AnalysisJobRunnerTest`, `AnalysisQueueServiceTest`가 맡는다. 조회는 `AnalysisProgressControllerTest`, `ReportControllerTest`, `WidgetControllerTest`, `HealthControllerTest`, 클라이언트 로직과 로그는 `GitHubClientTest`, `LlmClientTest`, `CommitFilterTest`, `PinoJsonFormatterTest`, `SecretScrubberTest`가 맡는다.
+  - 캐시를 쓰지 않고 `./gradlew cleanTest test`로 다시 돌렸더니 293개가 모두 통과했다(실패 0, 건너뜀 0). Testcontainers가 Docker를 쓰므로 로컬에서도 Docker가 떠 있어야 하고 빌드는 JDK 25 툴체인으로 돈다.
+  - 대상이 사라지는 Jest 테스트(SSE, Redis·큐, PDF, Next 빌드)는 계획대로 옮기지 않았다. CI의 test 잡을 `./gradlew test`로 바꾸는 일은 S-7에서 한다.
 
 ## S-7. 배포 파이프라인 교체와 운영 전환
 

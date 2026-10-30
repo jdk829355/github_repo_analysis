@@ -89,7 +89,7 @@ src/test/resources/
 | Q2 | Java 버전 | 결정: 25. Spring Boot 4.1.2, Hibernate 7.4, Lombok 1.18.48과 함께 빌드와 테스트가 문제없이 돈다 |
 | Q3 | 전환할 때 몇 분 정도 서비스가 멈춰도 되나 | 결정: 된다고 보고 진행한다. 안 된다면 S-7 절차를 다시 짠다 |
 | Q4 | 프로필 리포트 재사용 조건을 그대로 둘까 | 결정: 그대로 둔다. S-4에서 이전 작업의 저장소를 `status = COMPLETED`로 걸러 지문을 만든다(S-2 "동작 변화 주의") |
-| Q5 | 서버 메모리 여유 | 결정: 서버 메모리는 3.7GiB이고 Node 앱이 도는 지금 여유(available)가 2.4GiB다. compose `mem_limit: 1g`, `-XX:MaxRAMPercentage=70`(힙 약 700MB)으로 둔다 |
+| Q5 | 서버 메모리 여유 | 결정: 서버 메모리는 3.7GiB이고 Node 앱이 도는 지금 여유(available)가 2.4GiB다. 힙은 `-Xmx700m`로 고정한다. 서버 커널에 메모리 cgroup이 없어서 compose `mem_limit: 1g`가 무시되기 때문이다 |
 | Q6 | 최상위 패키지 이름(`{base}`) | 결정: `pinnedsignal`. DB 스키마 이름과 같다 |
 
 ## 진행 방식
@@ -106,7 +106,7 @@ src/test/resources/
 | S-4 | 분석 파이프라인과 DB 큐 | 2~3일 | 완료 `9a60ec2` |
 | S-5 | 화면과 엔드포인트 (Thymeleaf + HTMX) | 3~4일 | 완료 `ae03a82` |
 | S-6 | 테스트 | 3~4일 (S-1~S-5와 함께) | 완료 |
-| S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 진행 중 (배포 설정 완료, 운영 전환 대기) |
+| S-7 | 배포 파이프라인 교체와 운영 전환 | 1~2일 | 진행 중 (배포 완료, 운영 확인 대기) |
 | S-8 | Node 코드 제거, 루트로 이동, 문서 갱신 | 0.5일 | 대기 |
 
 합계는 약 2.5~3주다. 가장 큰 위험은 S-4의 파이프라인 동작(재사용 규칙, 타임아웃, 실패 처리)을 지금과 똑같이 맞추는 일이다.
@@ -368,7 +368,7 @@ src/test/resources/
 - **compose**: 서비스는 `app` 하나만 남긴다. `worker`, `redis`, `redis_data` 볼륨을 지운다. 로그 로테이션과 `restart: unless-stopped`는 유지한다. 컨테이너 이름이 바뀌면 Alloy 수집 설정(O-5)도 함께 맞춘다. 파일은 `deploy/docker-compose.yml`로 옮기고 배포 스크립트의 `docker compose` 명령에 `-f deploy/docker-compose.yml`을 준다.
 - **결과** (배포 설정)
   - `server/Dockerfile`은 `eclipse-temurin:25-jdk`에서 `./gradlew bootJar`로 jar를 만들고 `eclipse-temurin:25-jre`에서 `app` 사용자로 실행한다. Tailwind standalone CLI가 glibc 바이너리라서 alpine 이미지는 쓰지 않는다. CLI는 Gradle 작업이 빌드 중에 내려받는다. 빌드 컨텍스트가 `server/`로 바뀌어 루트의 Node용 `Dockerfile`과 `.dockerignore`는 지웠다.
-  - 메모리는 Q5에 따라 `mem_limit: 1g`, `-XX:MaxRAMPercentage=70`으로 두었다. 로컬에서 768MB 한도로 띄웠을 때 기동 직후 컨테이너 메모리는 약 400MB였다. 전환하면 Node 앱, 워커, Redis가 빠지므로 서버의 여유 메모리는 지금보다 늘어난다.
+  - 메모리는 Q5에 따라 힙을 `-Xmx700m`로 고정했다. 처음에는 `mem_limit: 1g`와 `-XX:MaxRAMPercentage=70`으로 두었는데 첫 배포 로그에 "Limitation discarded"가 나왔다. 서버 커널에 메모리 cgroup이 없어서 `mem_limit`이 무시된 것이다. 이러면 JVM은 서버 메모리 전체(3.7GiB)의 70%를 힙 상한으로 잡는다. `mem_limit`은 나중에 cgroup을 켜면 적용되도록 남겨 두었다. 로컬에서 768MB 한도로 띄웠을 때 기동 직후 컨테이너 메모리는 약 400MB였다. 전환하면 Node 앱, 워커, Redis가 빠지므로 서버의 여유 메모리는 지금보다 늘어난다.
   - 컨테이너 안에서는 Spring 기본 포트 8080으로 듣고 compose가 `3000:8080`으로 연결한다. 바깥 포트가 그대로라 리버스 프록시 설정은 바꾸지 않는다.
   - compose 파일을 `deploy/`로 옮기면 Compose가 `deploy/`를 프로젝트 디렉터리로 본다. 그러면 프로젝트 이름이 `deploy`가 되고 루트의 `.env`도 읽지 않는다. 그래서 배포 스크립트는 `docker compose --project-directory . -f deploy/docker-compose.yml`로 실행한다. 서버에서 compose 명령을 직접 칠 때도 같은 옵션을 줘야 한다.
   - 서비스 이름이 `next-app`에서 `app`으로 바뀌면 예전 `next-app` 컨테이너가 3000번 포트를 쥔 채 남아 새 컨테이너가 뜨지 못한다. 그래서 배포 스크립트의 `up -d`에 `--remove-orphans`를 붙였다. 첫 배포 때 `worker`와 `redis` 컨테이너도 함께 지워지고 `redis_data` 볼륨은 남는다.

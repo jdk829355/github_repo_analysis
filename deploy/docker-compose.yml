@@ -14,7 +14,8 @@ services:
     image: ghcr.io/jdk829355/github_repo_analysis:${IMAGE_TAG:-latest}
     restart: unless-stopped
     logging: *default-logging
-    # JVM 힙은 이 한도의 70%다(Dockerfile의 MaxRAMPercentage).
+    # 서버 커널에 메모리 cgroup이 없어서 지금은 적용되지 않는다(배포 로그의 "Limitation discarded").
+    # 힙 상한은 Dockerfile의 -Xmx700m가 정한다.
     mem_limit: 1g
     ports:
       - "3000:8080"

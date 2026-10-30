@@ -16,5 +16,5 @@ USER app
 
 EXPOSE 8080
 
-# 힙 상한은 컨테이너 메모리 한도(compose의 mem_limit)의 70%다.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "app.jar"]
+# 서버 커널에 메모리 cgroup이 없어 compose의 mem_limit이 무시된다. 비율로 잡으면 서버 메모리 전체가 기준이 되므로 힙 상한을 직접 정한다.
+ENTRYPOINT ["java", "-Xmx700m", "-jar", "app.jar"]

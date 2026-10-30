@@ -7,6 +7,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import ch.qos.logback.classic.util.LogbackMDCAdapter;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,17 @@ class LogMembersCustomizerTest {
         assertThat(line.get("prompt").asString()).isEqualTo("[REDACTED]");
         assertThat(line.get("headers").get("authorization").asString()).isEqualTo("[REDACTED]");
         assertThat(line.get("headers").get("accept").asString()).isEqualTo("json");
+    }
+
+    @Test
+    void writesListValues() {
+        LoggingEvent event = event(Level.INFO, "repos", null);
+        event.addKeyValuePair(new KeyValuePair("repos", List.of("a", "b")));
+
+        JsonNode line = format(event);
+
+        assertThat(line.get("repos").get(0).asString()).isEqualTo("a");
+        assertThat(line.get("repos").get(1).asString()).isEqualTo("b");
     }
 
     @Test

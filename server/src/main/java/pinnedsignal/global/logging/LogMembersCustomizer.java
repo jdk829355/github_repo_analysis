@@ -20,16 +20,21 @@ public class LogMembersCustomizer implements StructuredLoggingJsonMembersCustomi
 
     @Override
     public void customize(Members<ILoggingEvent> members) {
+        // 인자로 들어간 메서드가 이벤트를 받아서 새로운 멤버의 값을 채움 (null이 아닐 때만)
         members.add("err", LogMembersCustomizer::loggableFields).whenNotNull();
+        // 이름으로 걸러서 대상 키의 데이터를 타입 상관 없이 마스킹
+        // 배열 원소는 이름이 null이고 Set.of는 contains(null)에서 NPE를 던지므로 먼저 거른다.
         members.applyingValueProcessor(ValueProcessor.<Object>of(value -> SecretScrubber.REDACTED)
-                .whenHasPath(path -> REDACT_KEYS.contains(path.name())));
+                .whenHasPath(path -> path.name() != null && REDACT_KEYS.contains(path.name())));
+        // 정규식으로 걸러야하니까 value가 String인 필드에만 적용
         members.applyingValueProcessor(ValueProcessor.of(String.class, SecretScrubber::scrub));
     }
 
     private static Map<String, Object> loggableFields(ILoggingEvent event) {
+        // 예외가 있으면서 그 예외가 LoggableException인 경우
         if (event.getThrowableProxy() instanceof ThrowableProxy proxy
                 && proxy.getThrowable() instanceof LoggableException loggable) {
-            return loggable.logFields();
+            return loggable.logFields(); // 결국 이게 err 필드에 들어가는 것
         }
         return null;
     }

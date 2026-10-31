@@ -68,6 +68,26 @@ class WidgetControllerTest {
     }
 
     @Test
+    void usernamePathServesTheLatestWidgetWithTheSameHeaders() throws Exception {
+        when(widgetService.findSvgByUsername("octocat", Theme.DARK)).thenReturn(Optional.of("<svg>dark</svg>"));
+
+        mockMvc.perform(get("/api/widget/user/octocat").param("theme", "dark"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/svg+xml;charset=utf-8"))
+                .andExpect(header().string("Cache-Control", "public, max-age=300, stale-while-revalidate=86400"))
+                .andExpect(content().string("<svg>dark</svg>"));
+    }
+
+    @Test
+    void usernamePathReturnsPlainText404WhenThereIsNoCompletedJob() throws Exception {
+        when(widgetService.findSvgByUsername("ghost", Theme.LIGHT)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/widget/user/ghost"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("Widget not found"));
+    }
+
+    @Test
     void returnsPlainText404WhenThereIsNoWidget() throws Exception {
         when(widgetService.findSvg("missing", Theme.LIGHT)).thenReturn(Optional.empty());
 

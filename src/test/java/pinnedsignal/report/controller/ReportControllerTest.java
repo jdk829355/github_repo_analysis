@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
@@ -31,7 +32,7 @@ class ReportControllerTest {
     private static ReportResponse report(List<String> strengths, List<String> greenFlags, List<String> redFlags,
             List<RepoCard> repos) {
         return new ReportResponse("전체 요약 문장", new RoleEstimation("Backend", List.of("DevOps"), List.of("SRE")),
-                strengths, List.of("코드 리뷰를 꼼꼼히 한다"), greenFlags, redFlags, repos);
+                strengths, List.of("코드 리뷰를 꼼꼼히 한다"), greenFlags, redFlags, repos, "octocat");
     }
 
     @Test
@@ -58,7 +59,7 @@ class ReportControllerTest {
     }
 
     @Test
-    void markdownUsesTheRequestOriginForWidgetAndReportUrls() throws Exception {
+    void markdownUsesTheRequestOriginAndTheUsernameForWidgetAndReportUrls() throws Exception {
         when(reportQueryService.getReport("job-1")).thenReturn(report(List.of(), List.of(), List.of(), List.of()));
 
         mockMvc.perform(get("/report/job-1").with(request -> {
@@ -69,16 +70,35 @@ class ReportControllerTest {
                 }))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(
-                        "[![Pinned Signal profile widget](https://pinned.example.com/api/widget/job-1?theme=light)]"
-                                + "(https://pinned.example.com/report/job-1)")))
-                .andExpect(content().string(containsString("data-widget-url=\"https://pinned.example.com/api/widget/job-1\"")))
-                .andExpect(content().string(containsString("data-report-url=\"https://pinned.example.com/report/job-1\"")));
+                        "[![Pinned Signal profile widget](https://pinned.example.com/api/widget/user/octocat?theme=light)]"
+                                + "(https://pinned.example.com/report/user/octocat)")))
+                .andExpect(content().string(containsString(
+                        "data-widget-url=\"https://pinned.example.com/api/widget/user/octocat\"")))
+                .andExpect(content().string(containsString(
+                        "data-report-url=\"https://pinned.example.com/report/user/octocat\"")));
+    }
+
+    @Test
+    void userReportPathRedirectsToTheLatestCompletedReport() throws Exception {
+        when(reportQueryService.getLatestJobId("octocat")).thenReturn("job-2");
+
+        mockMvc.perform(get("/report/user/octocat"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/report/job-2"));
+    }
+
+    @Test
+    void userReportPathIs404WhenThereIsNoCompletedJob() throws Exception {
+        when(reportQueryService.getLatestJobId("ghost")).thenThrow(new NotFoundException("report not found: ghost"));
+
+        mockMvc.perform(get("/report/user/ghost"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     void emptyFlagListsShowAPlaceholderAndEmptySectionsAreLeftOut() throws Exception {
         when(reportQueryService.getReport("job-1")).thenReturn(new ReportResponse("요약",
-                new RoleEstimation("Backend", List.of(), List.of()), List.of(), List.of(), List.of(), List.of(), List.of()));
+                new RoleEstimation("Backend", List.of(), List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), "octocat"));
 
         mockMvc.perform(get("/report/job-1"))
                 .andExpect(status().isOk())
@@ -124,7 +144,7 @@ class ReportControllerTest {
     @Test
     void reportTextIsEscaped() throws Exception {
         when(reportQueryService.getReport("job-1")).thenReturn(new ReportResponse("<img src=x onerror=alert(1)>",
-                new RoleEstimation("Backend", List.of(), List.of()), List.of(), List.of(), List.of(), List.of(), List.of()));
+                new RoleEstimation("Backend", List.of(), List.of()), List.of(), List.of(), List.of(), List.of(), List.of(), "octocat"));
 
         mockMvc.perform(get("/report/job-1"))
                 .andExpect(content().string(not(containsString("<img src=x onerror=alert(1)>"))))

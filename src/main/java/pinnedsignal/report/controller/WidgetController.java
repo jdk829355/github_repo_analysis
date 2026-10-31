@@ -1,5 +1,6 @@
 package pinnedsignal.report.controller;
 
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,12 +25,26 @@ public class WidgetController {
     @GetMapping("/api/widget/{jobId}")
     public ResponseEntity<String> widget(@PathVariable String jobId,
             @RequestParam(required = false) String theme) {
-        Theme requested = "dark".equals(theme) ? Theme.DARK : Theme.LIGHT;
-        return widgetService.findSvg(jobId, requested)
-                .map(svg -> ResponseEntity.ok()
+        return respond(widgetService.findSvg(jobId, themeOf(theme)));
+    }
+
+    // 재분석해도 README의 주소가 그대로이도록 사용자의 가장 최근 완료 작업을 보여준다.
+    @GetMapping("/api/widget/user/{username}")
+    public ResponseEntity<String> widgetByUsername(@PathVariable String username,
+            @RequestParam(required = false) String theme) {
+        return respond(widgetService.findSvgByUsername(username, themeOf(theme)));
+    }
+
+    private static Theme themeOf(String theme) {
+        return "dark".equals(theme) ? Theme.DARK : Theme.LIGHT;
+    }
+
+    private static ResponseEntity<String> respond(Optional<String> svg) {
+        return svg
+                .map(body -> ResponseEntity.ok()
                         .header(HttpHeaders.CONTENT_TYPE, "image/svg+xml; charset=utf-8")
                         .header(HttpHeaders.CACHE_CONTROL, "public, max-age=300, stale-while-revalidate=86400")
-                        .body(svg))
+                        .body(body))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .header(HttpHeaders.CONTENT_TYPE, "text/plain; charset=utf-8")
                         .body("Widget not found"));

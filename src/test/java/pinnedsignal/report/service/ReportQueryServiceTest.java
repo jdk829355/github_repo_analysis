@@ -41,6 +41,7 @@ class ReportQueryServiceTest extends IntegrationTestBase {
         ReportResponse report = reportQueryService.getReport(job.getId());
 
         assertThat(report.overallSummary()).isEqualTo("전체 요약");
+        assertThat(report.username()).isEqualTo("octocat");
         assertThat(report.roleEstimation().primary()).isEqualTo("Backend");
         assertThat(report.roleEstimation().secondary()).containsExactly("DevOps");
         assertThat(report.roleEstimation().recommended()).containsExactly("SRE");
@@ -66,6 +67,15 @@ class ReportQueryServiceTest extends IntegrationTestBase {
         assertThat(report.redFlags()).isEmpty();
         assertThat(report.engineeringStrengths()).isEmpty();
         assertThat(report.collaborationPatterns()).isEmpty();
+    }
+
+    @Test
+    void latestJobIdIgnoresFailedJobsAndUnknownUsersAreNotFound() {
+        AnalysisJob completed = AnalysisFixtures.completedJob(jobRepository, "octocat");
+        AnalysisFixtures.failedJob(jobRepository, "octocat", "실패");
+
+        assertThat(reportQueryService.getLatestJobId("octocat")).isEqualTo(completed.getId());
+        assertThatThrownBy(() -> reportQueryService.getLatestJobId("nobody")).isInstanceOf(NotFoundException.class);
     }
 
     @Test

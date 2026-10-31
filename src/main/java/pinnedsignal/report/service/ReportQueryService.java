@@ -8,6 +8,7 @@ import pinnedsignal.analysis.dto.response.CompletedAnalysis;
 import pinnedsignal.analysis.enums.RepoStatus;
 import pinnedsignal.analysis.service.AnalysisQueryService;
 import pinnedsignal.global.exception.NotFoundException;
+import pinnedsignal.global.util.GitHubUrls;
 import pinnedsignal.report.dto.response.ReportResponse;
 import pinnedsignal.report.dto.response.ReportResponse.RepoCard;
 import pinnedsignal.report.entity.ProfileReport;
@@ -41,6 +42,7 @@ public class ReportQueryService {
                 .toList();
 
         RoleEstimation role = report.getRoleEstimation();
+        String username = GitHubUrls.usernameOf(analysis.githubProfile());
         return new ReportResponse(
                 report.getOverallSummary(),
                 new RoleEstimation(role.primary(), orEmpty(role.secondary()), orEmpty(role.recommended())),
@@ -48,7 +50,14 @@ public class ReportQueryService {
                 orEmpty(report.getCollaborationPatterns()),
                 orEmpty(report.getGreenFlags()),
                 orEmpty(report.getRedFlags()),
-                repositories);
+                repositories,
+                username);
+    }
+
+    /** @throws NotFoundException 사용자의 COMPLETED 작업이 없을 때 */
+    public String getLatestJobId(String username) {
+        return analysisQueryService.findLatestCompletedJobId(username)
+                .orElseThrow(() -> new NotFoundException("report not found: " + username));
     }
 
     private static String orEmpty(String value) {

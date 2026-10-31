@@ -22,6 +22,13 @@ public class WidgetService {
     private final AnalysisQueryService analysisQueryService;
     private final ProfileReportRepository profileReportRepository;
 
+    /** 사용자의 가장 최근 COMPLETED 작업의 위젯. 그런 작업이 없으면 empty. */
+    @Transactional
+    public Optional<String> findSvgByUsername(String username, Theme theme) {
+        return analysisQueryService.findLatestCompletedJobId(username)
+                .flatMap(jobId -> findSvg(jobId, theme));
+    }
+
     /**
      * 저장된 SVG가 현재 버전이면 그대로 돌려주고, 아니면 다시 만들어 저장한다.
      *

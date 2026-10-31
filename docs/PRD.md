@@ -267,6 +267,7 @@ PDF에는 다음이 포함되어야 한다.
 분석이 끝난 profile의 요약 카드를 SVG 이미지로 제공한다. GitHub README에 붙여 넣는 용도이다.
 
 * `GET /api/widget/[jobId]?theme=light|dark`로 제공한다. theme을 생략하면 light이다.
+* `GET /api/widget/user/[username]?theme=light|dark`는 그 사용자의 가장 최근 COMPLETED 작업의 위젯을 준다. 재분석해도 README 주소가 그대로이고 `GET /report/user/[username]`은 가장 최근 리포트로 리다이렉트한다. 리포트 화면이 만들어 주는 Markdown은 이 주소를 쓴다.
 * 위젯에는 사용자명, 요약, 역할, Green/Red Flags, 주요 언어가 들어간다.
 * 리포트를 만들 때 라이트·다크 SVG를 함께 만들어 저장한다. 저장된 SVG가 현재 위젯 버전이 아니면 다시 만든다.
 * 리포트 화면의 "SVG 위젯 내보내기"에서 미리보기와 Markdown 코드 복사를 제공한다.

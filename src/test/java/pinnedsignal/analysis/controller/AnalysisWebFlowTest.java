@@ -97,7 +97,16 @@ class AnalysisWebFlowTest extends IntegrationTestBase {
                 .andExpect(content().string(containsString("꾸준한 커밋")))
                 .andExpect(content().string(containsString("문서가 적다")))
                 .andExpect(content().string(containsString("로그인 흐름을 구현한 웹 앱")))
-                .andExpect(content().string(containsString("/api/widget/" + jobId + "?theme=light")));
+                .andExpect(content().string(containsString("/api/widget/user/octocat?theme=light")));
+
+        // README에 붙는 사용자 기준 주소는 가장 최근 완료 작업의 위젯과 리포트로 이어진다
+        mockMvc.perform(get("/api/widget/user/Octocat").param("theme", "dark"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("@ octocat")));
+        mockMvc.perform(get("/report/user/octocat"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/report/" + jobId));
+        mockMvc.perform(get("/api/widget/user/nobody")).andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/widget/" + jobId).param("theme", "dark"))
                 .andExpect(status().isOk())

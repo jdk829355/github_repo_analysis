@@ -16,6 +16,7 @@ import pinnedsignal.analysis.enums.RepoStatus;
 import pinnedsignal.analysis.repository.AnalysisJobRepository;
 import pinnedsignal.analysis.repository.RepoRepository;
 import pinnedsignal.global.exception.NotFoundException;
+import pinnedsignal.global.util.GitHubUrls;
 
 // 화면이 읽는 쪽. 상태를 쓰는 AnalysisProgressService와 나눠 둔다.
 @Service
@@ -54,6 +55,13 @@ public class AnalysisQueryService {
                                         repo.getName(), repo.getDescription(), repo.getPrimaryLanguage(),
                                         repo.getStars(), repo.getStatus()))
                                 .toList()));
+    }
+
+    /** 사용자의 가장 최근 COMPLETED 작업 id. */
+    public Optional<String> findLatestCompletedJobId(String username) {
+        return analysisJobRepository.findFirstByGithubProfileIgnoreCaseAndStatusOrderByCreatedAtDesc(
+                        GitHubUrls.profileUrlOf(username), AnalysisJobStatus.COMPLETED)
+                .map(AnalysisJob::getId);
     }
 
     private static boolean isFinished(RepoStatus status) {

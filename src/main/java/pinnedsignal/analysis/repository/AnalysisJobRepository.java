@@ -15,6 +15,10 @@ public interface AnalysisJobRepository extends JpaRepository<AnalysisJob, String
     Optional<AnalysisJob> findFirstByGithubProfileAndStatusAndIdNotOrderByCreatedAtDesc(
             String githubProfile, AnalysisJobStatus status, String excludedId);
 
+    // GitHub 사용자명은 대소문자를 구분하지 않지만 github_profile은 입력한 대로 저장되므로 대소문자를 무시하고 찾는다.
+    Optional<AnalysisJob> findFirstByGithubProfileIgnoreCaseAndStatusOrderByCreatedAtDesc(
+            String githubProfile, AnalysisJobStatus status);
+
     // 같은 프로필의 진행 중인 작업. partial unique index 때문에 많아야 하나다.
     Optional<AnalysisJob> findFirstByGithubProfileAndStatusInOrderByCreatedAtDesc(
             String githubProfile, Collection<AnalysisJobStatus> statuses);

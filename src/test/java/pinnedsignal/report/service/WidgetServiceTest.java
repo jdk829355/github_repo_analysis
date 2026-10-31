@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import pinnedsignal.analysis.entity.AnalysisJob;
 import pinnedsignal.analysis.enums.RepoStatus;
 import pinnedsignal.analysis.repository.AnalysisJobRepository;
@@ -28,6 +29,8 @@ class WidgetServiceTest extends IntegrationTestBase {
     private RepoRepository repoRepository;
     @Autowired
     private ProfileReportRepository reportRepository;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private ProfileReport reload(AnalysisJob job) {
         return reportRepository.findByAnalysisJobId(job.getId()).orElseThrow();
@@ -40,6 +43,21 @@ class WidgetServiceTest extends IntegrationTestBase {
 
         assertThat(widgetService.findSvg(job.getId(), Theme.LIGHT)).contains(CURRENT_LIGHT);
         assertThat(widgetService.findSvg(job.getId(), Theme.DARK)).contains(CURRENT_DARK);
+    }
+
+    @Test
+    void usernameLookupServesTheLatestCompletedJobIgnoringCase() {
+        AnalysisJob older = AnalysisFixtures.completedJob(jobRepository, "octocat");
+        AnalysisFixtures.report(reportRepository, older, "<svg data-widget-version=\"inner-card-v4\">old</svg>",
+                CURRENT_DARK);
+        jdbcTemplate.update("UPDATE analysis_jobs SET created_at = created_at - interval '1 day' WHERE id = ?",
+                older.getId());
+        AnalysisJob latest = AnalysisFixtures.completedJob(jobRepository, "octocat");
+        AnalysisFixtures.report(reportRepository, latest, CURRENT_LIGHT, CURRENT_DARK);
+        AnalysisFixtures.failedJob(jobRepository, "octocat", "실패");
+
+        assertThat(widgetService.findSvgByUsername("OctoCat", Theme.LIGHT)).contains(CURRENT_LIGHT);
+        assertThat(widgetService.findSvgByUsername("nobody", Theme.LIGHT)).isEmpty();
     }
 
     @Test

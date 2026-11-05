@@ -31,8 +31,8 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 | O-2 | pino 로거, 워커·작업 생명주기 로그 | 완료 `01a7aca` |
 | O-3 | GitHub·LLM 클라이언트 로그 | 완료 `b1f9198` |
 | O-4 | API 500 처리와 사용자에게 보이는 내부 에러 정리 | 완료 |
-| O-5 | Alloy로 Grafana Cloud에 로그 보내기 | 코드 작성, 배포 전 |
-| O-6 | 인프라 메트릭 수집 | 대기 |
+| O-5 | Alloy로 Grafana Cloud에 로그 보내기 | 완료 `ed74891` |
+| O-6 | 인프라 메트릭 수집 | 코드 작성, 배포 전 |
 | O-7 | 업타임 체크 등록 | 대기 (사용자) |
 | O-8 | 로그 기반 대시보드와 알림 | 대기 |
 
@@ -109,12 +109,16 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 - `level` 값은 `ERROR`처럼 대문자다. 쿼리 조건도 대문자로 쓴다.
 - `config.alloy`만 바꾸면 배포해도 반영되지 않는다. 서버에서 `docker compose --project-directory . -f deploy/docker-compose.yml up -d --force-recreate alloy`를 실행한다.
 - 로컬 Loki로 수집 경로를 확인했다. 레이블이 위 설명대로 붙었고 다른 compose 프로젝트의 로그는 들어오지 않았다.
-- 남은 확인: 배포한 뒤 Grafana Explore에서 `{container="github_repo_analysis-app-1"} | json | event="job.started"`로 분석 하나가 보이는지 본다.
+- `GRAFANA_LOKI_URL`에는 `/loki/api/v1/push`까지 넣는다. 호스트만 넣으면 Loki가 405를 돌려주고 로그가 버려진다.
+- 배포 후 Grafana Explore에서 앱 로그가 들어오는 것을 사용자가 확인했다.
 
 ## O-6. 인프라 메트릭 수집
 
-- 같은 Alloy 설정에 `prometheus.exporter.unix`(서버 CPU·메모리·디스크)와 `prometheus.exporter.cadvisor`(컨테이너별 사용량)를 추가하고 `prometheus.remote_write`로 보낸다.
-- 확인: Grafana에서 컨테이너별 메모리 그래프가 나오는지 본다.
+- 같은 Alloy 설정에 `prometheus.exporter.unix`(서버 CPU·메모리·디스크)와 `prometheus.exporter.cadvisor`(컨테이너별 사용량)를 추가하고 `prometheus.remote_write`로 보낸다. 서버 `.env`의 `GRAFANA_PROM_URL`, `GRAFANA_PROM_USER`를 쓴다.
+- [docker-compose.yml](../../deploy/docker-compose.yml)에 호스트 경로를 읽기 전용으로 마운트했다. Alloy 문서의 Docker 예시는 `privileged: true`를 쓰지만 권한을 줄이려고 빼고 시작한다. 컨테이너별 메트릭이 비면 이 설정부터 다시 본다.
+- 로컬 Prometheus로 서버 메트릭과 `instance="pinned-signal"` 레이블을 확인했다. 시계열은 약 2,300개였다. Docker Desktop에서는 cAdvisor가 컨테이너별 값을 만들지 못해서 이 부분과 `mountpoint="/"` 디스크 값은 서버에서만 확인할 수 있다. cAdvisor가 Docker를 찾지 못해도 Alloy는 멈추지 않았다.
+- 서버 커널에 메모리 cgroup이 없어서 컨테이너별 메모리 값이 나오지 않을 수 있다.
+- 남은 확인: Grafana에서 컨테이너별 메모리 그래프가 나오는지 본다.
 
 ## O-7. 업타임 체크 등록
 

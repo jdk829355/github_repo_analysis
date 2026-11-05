@@ -49,3 +49,32 @@ loki.write "grafana_cloud" {
 		}
 	}
 }
+
+// 서버 CPU·메모리·디스크. 컨테이너 안에서 돌기 때문에 호스트 경로를 마운트한 곳에서 읽는다.
+prometheus.exporter.unix "server" {
+	rootfs_path = "/rootfs"
+	procfs_path = "/host/proc"
+}
+
+// 컨테이너별 사용량.
+prometheus.exporter.cadvisor "containers" {
+	docker_host            = "unix:///var/run/docker.sock"
+	docker_only            = true
+	store_container_labels = false
+}
+
+prometheus.scrape "metrics" {
+	targets    = array.concat(prometheus.exporter.unix.server.targets, prometheus.exporter.cadvisor.containers.targets)
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_PROM_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_PROM_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+}

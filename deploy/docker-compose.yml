@@ -27,3 +27,26 @@ services:
       - LLM_BASE_URL=${LLM_BASE_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
+
+  alloy:
+    # Docker 소켓에 접근하는 컨테이너는 사실상 호스트 권한이 있으므로 공식 이미지를 버전까지 고정한다.
+    image: grafana/alloy:v1.21.3
+    restart: unless-stopped
+    logging: *default-logging
+    # 읽은 위치를 볼륨에 남겨 재시작해도 로그를 다시 보내지 않는다.
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    # config.alloy만 바꾸면 배포해도 반영되지 않는다. 서버에서 `up -d --force-recreate alloy`를 실행한다.
+    volumes:
+      - ./deploy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    environment:
+      - GRAFANA_LOKI_URL=${GRAFANA_LOKI_URL}
+      - GRAFANA_LOKI_USER=${GRAFANA_LOKI_USER}
+      - GRAFANA_CLOUD_TOKEN=${GRAFANA_CLOUD_TOKEN}
+
+volumes:
+  alloy-data:

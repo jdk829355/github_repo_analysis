@@ -31,7 +31,7 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 | O-2 | pino 로거, 워커·작업 생명주기 로그 | 완료 `01a7aca` |
 | O-3 | GitHub·LLM 클라이언트 로그 | 완료 `b1f9198` |
 | O-4 | API 500 처리와 사용자에게 보이는 내부 에러 정리 | 완료 |
-| O-5 | Alloy로 Grafana Cloud에 로그 보내기 | 대기 (사용자: Grafana Cloud 계정) |
+| O-5 | Alloy로 Grafana Cloud에 로그 보내기 | 코드 작성, 배포 전 |
 | O-6 | 인프라 메트릭 수집 | 대기 |
 | O-7 | 업타임 체크 등록 | 대기 (사용자) |
 | O-8 | 로그 기반 대시보드와 알림 | 대기 |
@@ -103,11 +103,13 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 
 ## O-5. Alloy로 Grafana Cloud에 로그 보내기
 
-- 사용자가 Grafana Cloud 스택을 만들고 Loki·Prometheus 주소와 토큰을 서버 `.env`에 넣는다.
-- [docker-compose.yml](../../deploy/docker-compose.yml)에 `grafana/alloy` 서비스를 추가한다. Docker 소켓은 읽기 전용으로 마운트한다. 소켓에 접근하는 컨테이너에는 사실상 호스트 권한이 있으므로 공식 이미지만 쓴다.
-- `config.alloy`: `discovery.docker` → `loki.source.docker` → `loki.write`. 레이블은 컨테이너 이름과 `level`만 붙인다.
+- 사용자가 Grafana Cloud 스택과 토큰을 만들어 서버 `.env`에 `GRAFANA_LOKI_URL`, `GRAFANA_LOKI_USER`, `GRAFANA_CLOUD_TOKEN`으로 넣었다.
+- [docker-compose.yml](../../deploy/docker-compose.yml)에 `grafana/alloy:v1.21.3` 서비스를 추가했다. Docker 소켓은 읽기 전용으로 마운트한다. 소켓에 접근하는 컨테이너에는 사실상 호스트 권한이 있으므로 공식 이미지를 버전까지 고정해 쓴다.
+- [config.alloy](../../deploy/config.alloy): `discovery.docker` → `loki.source.docker` → `loki.process` → `loki.write`. 같은 서버의 다른 컨테이너 로그가 나가지 않도록 이 compose 프로젝트의 컨테이너만 읽는다. 레이블은 컨테이너 이름과 `level`만 붙인다.
 - `level` 값은 `ERROR`처럼 대문자다. 쿼리 조건도 대문자로 쓴다.
-- 확인: Grafana Explore에서 `{container="github_repo_analysis-app-1"} | json | event="job.started"`로 분석 하나가 보이는지 본다.
+- `config.alloy`만 바꾸면 배포해도 반영되지 않는다. 서버에서 `docker compose --project-directory . -f deploy/docker-compose.yml up -d --force-recreate alloy`를 실행한다.
+- 로컬 Loki로 수집 경로를 확인했다. 레이블이 위 설명대로 붙었고 다른 compose 프로젝트의 로그는 들어오지 않았다.
+- 남은 확인: 배포한 뒤 Grafana Explore에서 `{container="github_repo_analysis-app-1"} | json | event="job.started"`로 분석 하나가 보이는지 본다.
 
 ## O-6. 인프라 메트릭 수집
 

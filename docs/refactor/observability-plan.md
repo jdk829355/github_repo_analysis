@@ -32,9 +32,9 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 | O-3 | GitHub·LLM 클라이언트 로그 | 완료 `b1f9198` |
 | O-4 | API 500 처리와 사용자에게 보이는 내부 에러 정리 | 완료 |
 | O-5 | Alloy로 Grafana Cloud에 로그 보내기 | 완료 `ed74891` |
-| O-6 | 인프라 메트릭 수집 | 코드 작성, 배포 전 |
-| O-7 | 업타임 체크 등록 | 대기 (사용자) |
-| O-8 | 로그 기반 대시보드와 알림 | 대기 |
+| O-6 | 인프라 메트릭 수집 | 완료 `4d817a8` |
+| O-7 | 업타임 체크 등록 | 완료 (사용자) |
+| O-8 | 로그 기반 대시보드와 알림 | 작성 완료, Grafana 등록 대기 (사용자) |
 
 ---
 
@@ -117,8 +117,7 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 - 같은 Alloy 설정에 `prometheus.exporter.unix`(서버 CPU·메모리·디스크)와 `prometheus.exporter.cadvisor`(컨테이너별 사용량)를 추가하고 `prometheus.remote_write`로 보낸다. 서버 `.env`의 `GRAFANA_PROM_URL`, `GRAFANA_PROM_USER`를 쓴다.
 - [docker-compose.yml](../../deploy/docker-compose.yml)에 호스트 경로를 읽기 전용으로 마운트했다. Alloy 문서의 Docker 예시는 `privileged: true`를 쓰지만 권한을 줄이려고 빼고 시작한다. 컨테이너별 메트릭이 비면 이 설정부터 다시 본다.
 - 로컬 Prometheus로 서버 메트릭과 `instance="pinned-signal"` 레이블을 확인했다. 시계열은 약 2,300개였다. Docker Desktop에서는 cAdvisor가 컨테이너별 값을 만들지 못해서 이 부분과 `mountpoint="/"` 디스크 값은 서버에서만 확인할 수 있다. cAdvisor가 Docker를 찾지 못해도 Alloy는 멈추지 않았다.
-- 서버 커널에 메모리 cgroup이 없어서 컨테이너별 메모리 값이 나오지 않을 수 있다.
-- 남은 확인: Grafana에서 컨테이너별 메모리 그래프가 나오는지 본다.
+- 배포 후 Grafana에서 서버 메모리·디스크와 컨테이너별 CPU·메모리 값이 모두 나오는 것을 사용자가 확인했다. `privileged: true`는 넣지 않았다.
 
 ## O-7. 업타임 체크 등록
 
@@ -127,8 +126,29 @@ Spring 마이그레이션(S-7) 뒤로 앱은 컨테이너 `app` 하나이고 로
 
 ## O-8. 로그 기반 대시보드와 알림
 
-- 대시보드: 시간당 `job.completed`·`job.failed` 건수(성공률), `job.completed`의 `durationMs` 분포, `llm.call`의 토큰 합계, `repo.failed` 원인별 건수.
-- 알림: `job.failed`가 연속으로 나올 때, `github.rate_limit_low`, 업타임 실패, 디스크 사용량 90% 이상.
+- [dashboard.json](../../deploy/grafana/dashboard.json): 성공률, 시간당 작업 수, 작업 소요 시간(p50·p95), 시간당 LLM 토큰, 저장소 분석 실패 원인을 보여 준다. Grafana의 Dashboards → New → Import로 넣고 데이터 소스는 `grafanacloud-<스택명>-logs`를 고른다.
+- 저장소 분석 실패 원인은 `stack_trace` 첫 줄의 예외 클래스와 `err_statusCode`로 묶는다.
+- 알림은 Alerting → Alert rules에서 직접 만든다. 로그 쿼리에 결과가 없으면 정상 상태이므로 로그 알림의 No data 상태는 Normal로 둔다.
+- 작업 연속 실패(logs): 결과가 0보다 크면 알린다. 1시간 안에 `job.failed`가 2번 이상이고 `job.completed`가 없을 때다.
+
+  ```
+  sum(count_over_time({container="github_repo_analysis-app-1"} | json | event="job.failed" [1h])) >= 2 unless sum(count_over_time({container="github_repo_analysis-app-1"} | json | event="job.completed" [1h])) > 0
+  ```
+
+- GitHub 한도 부족(logs): 결과가 0보다 크면 알린다.
+
+  ```
+  sum(count_over_time({container="github_repo_analysis-app-1"} | json | event="github.rate_limit_low" [5m]))
+  ```
+
+- 디스크 사용량(prom): 90 이상이 5분 지속되면 알린다.
+
+  ```
+  100 * (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})
+  ```
+
+- 업타임 실패 알림은 O-7의 체크에서 설정한다.
+- 로컬 Loki와 Grafana에 표본 로그를 넣어 쿼리와 import를 확인했다. Grafana Cloud의 실제 데이터로는 아직 확인하지 않았다.
 
 ---
 

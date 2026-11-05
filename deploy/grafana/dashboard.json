@@ -1,0 +1,209 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "grafanacloud-<스택명>-logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    { "type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0" }
+  ],
+  "uid": "pinned-signal-analysis",
+  "title": "Pinned Signal 분석 작업",
+  "tags": ["pinned-signal"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "browser",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "성공률",
+      "description": "job.completed / (job.completed + job.failed). 선택한 시간 범위 전체 기준이다.",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "sum(count_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"job.completed\" [$__range])) / (sum(count_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"job.completed\" [$__range])) + (sum(count_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"job.failed\" [$__range])) or vector(0)))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "시간당 작업 수",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "x": 6, "y": 0, "w": 18, "h": 8 },
+      "interval": "1h",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "성공" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "실패" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"], "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "성공",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "sum(count_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"job.completed\" [1h]))"
+        },
+        {
+          "refId": "B",
+          "queryType": "range",
+          "legendFormat": "실패",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "sum(count_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"job.failed\" [1h]))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "작업 소요 시간",
+      "description": "job.completed의 durationMs를 1시간 단위로 묶은 분포다.",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "interval": "1h",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "always", "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "p50",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "quantile_over_time(0.5, {container=\"github_repo_analysis-app-1\"} | json | event=\"job.completed\" | unwrap durationMs | __error__=\"\" [1h]) by (container)"
+        },
+        {
+          "refId": "B",
+          "queryType": "range",
+          "legendFormat": "p95",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "quantile_over_time(0.95, {container=\"github_repo_analysis-app-1\"} | json | event=\"job.completed\" | unwrap durationMs | __error__=\"\" [1h]) by (container)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "시간당 LLM 토큰",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "interval": "1h",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"], "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{kind}}",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "sum by (kind) (sum_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"llm.call\" | unwrap totalTokens | __error__=\"\" [1h]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "저장소 분석 실패 원인",
+      "description": "repo.failed를 예외 클래스와 상태 코드로 묶었다. 상세 내용은 Explore에서 event=\"repo.failed\"로 본다.",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 },
+      "interval": "1h",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"], "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{cause}} {{err_statusCode}}",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "sum by (cause, err_statusCode) (count_over_time({container=\"github_repo_analysis-app-1\"} | json | event=\"repo.failed\" | regexp `\"stack_trace\":\"(?:[\\w$]+\\.)*(?P<cause>[\\w$]+)` [1h]))"
+        }
+      ]
+    }
+  ]
+}
